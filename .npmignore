@@ -1,0 +1,15 @@
+
+.gitignore
+grunt-config.json
+gruntfile.js
+tsconfig.json
+tsd.json
+
+/src/**/*.js.map
+/src/**/*.test.js
+/src/**/*.ts
+
+/src/typings/
+
+.idea/
+utils/

@@ -1,0 +1,4 @@
+
+interface ICollectionOpts {}
+
+export = ICollectionOpts;

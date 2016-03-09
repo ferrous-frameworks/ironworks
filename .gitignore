@@ -1,0 +1,15 @@
+
+ironworks.iws
+
+npm-debug.log
+dump.rdb
+
+node_modules/
+.idea/
+
+src/**/*.js
+src/**/*.js.map
+
+src/typings/tsd/
+
+.DS_Store

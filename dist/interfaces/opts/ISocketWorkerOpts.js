@@ -1,0 +1,1 @@
+//# sourceMappingURL=ISocketWorkerOpts.js.map
