@@ -1,4 +1,4 @@
-///<reference path='../tsd/socket.io/socket.io.d.ts' />
+///<reference path='../../../typings/main/ambient/socket.io/index.d.ts' />
 
 interface CallbackResults {
     (e: Error, s?: boolean): any;

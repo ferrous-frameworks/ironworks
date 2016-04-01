@@ -6,10 +6,10 @@ dump.rdb
 
 node_modules/
 .idea/
+.c9
+.DS_Store
 
 src/**/*.js
 src/**/*.js.map
 
-src/typings/tsd/
-
-.DS_Store
+typings/

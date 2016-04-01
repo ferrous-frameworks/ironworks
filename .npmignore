@@ -1,15 +1,17 @@
 
 .gitignore
-grunt-config.json
-gruntfile.js
-tsconfig.json
-tsd.json
-
-/src/**/*.js.map
-/src/**/*.test.js
-/src/**/*.ts
-
-/src/typings/
+.travis.yml
+.c9
+.DS_Store
 
 .idea/
-utils/
+
+npm-debug.log
+iron-tree.iws
+
+gruntfile.js
+tsconfig.json
+typings.json
+
+src/
+typings/

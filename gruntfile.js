@@ -1,11 +1,9 @@
+
 var path = require('path');
 
 var _ = require('lodash');
 
-var tsConfigInit = require('./utils/tsc/tsConfigInit');
-
 module.exports = function(grunt) {
-
     var pathToNode = grunt.option('path-to-node');
     if (_.isUndefined(pathToNode)) {
         pathToNode = path.join(process.execPath, '/../../');
@@ -13,33 +11,26 @@ module.exports = function(grunt) {
 
     var tsBin = path.join(pathToNode, 'lib/node_modules/typescript/bin');
     var nodeBin = path.join(pathToNode, 'bin');
-    var projectRoot = __dirname;
-
-
-
+    
     grunt.loadNpmTasks('grunt-mocha-test');
     grunt.loadNpmTasks('grunt-shell');
     grunt.loadNpmTasks('grunt-bump');
 
     grunt.loadNpmTasks('grunt-contrib-copy');
     grunt.loadNpmTasks('grunt-contrib-clean');
-    grunt.loadNpmTasks('grunt-replace');
+    
     
     grunt.initConfig({
         pkg: grunt.file.readJSON('package.json'),
+        
+        
         nodeBin: nodeBin,
         tscExec: path.join(tsBin, 'tsc'),
+        
+        
         shell: {
-            tsd: {
-                command: [
-                    'mkdir -p src'
-                    , 'cd src'
-                    , 'mkdir -p typings'
-                    , 'cd typings'
-                    , 'mkdir -p tsd'
-                    , 'cd ' + projectRoot
-                    , '<%= nodeBin %>/tsd reinstall -s'
-                ].join('&&')
+            typings: {
+                command: 'typings install'
             },
 
             tsc: {
@@ -204,35 +195,15 @@ module.exports = function(grunt) {
         copy: {
             dist: {
                 files: [{
-                    options: {
-                        noProcess: 'src/**/*.test.js'
-                    },
                     expand: true,
                     cwd: 'src/',
-                    src: ['**/*.js', '**/*.d.ts', '*.d.ts', '../package.json'],
+                    src: ['**/*.js', '*.d.ts', '!**/*.test.js'],
                     dest: 'dist/'
                 }]
             }
         },
         clean: {
             dist: [ "dist" ]
-        },
-        replace: {
-            replaceNodeModuleInMasterD: {
-                options: {
-                    patterns: [
-                        {
-                            match: /node_modules/g,
-                            replacement: function () {
-                                return '..';
-                            }
-                        }
-                    ]
-                },
-                files: [
-                    {expand: true, flatten: true, src: ['dist/typings/master.d.ts'], dest: 'dist/typings'}
-                ]
-            }
         }
     });
 
@@ -261,23 +232,15 @@ module.exports = function(grunt) {
         });
     });
 
-    grunt.registerTask('help', 'ironworks grunt help', function () {
-        console.log("--- IRONWORKS GRUNT HELP ---");
-        console.log("\t --- options ---");
-        console.log("\t\t--path-to-node: path to the node bin directory. e.g. - /usr/bin/node/");
-    });
-
 
     grunt.registerTask('prep', [
-        'shell:tsd',
-        'tsconfig'
+        'shell:typings'
     ]);
 
     grunt.registerTask('build', [
         'shell:tsc',
         'clean:dist',
         'copy:dist',
-        'replace:replaceNodeModuleInMasterD',
         'shell:addDistToGit'
     ]);
 

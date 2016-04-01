@@ -1,3 +1,4 @@
+"use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -66,6 +67,6 @@ var BroadcastWorker = (function (_super) {
         //});
     };
     return BroadcastWorker;
-})(Worker);
+}(Worker));
 module.exports = BroadcastWorker;
 //# sourceMappingURL=BroadcastWorker.js.map

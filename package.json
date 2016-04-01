@@ -1,23 +1,27 @@
 {
   "name": "ironworks",
-  "version": "0.0.2",
+  "version": "0.0.3",
+  "description": "",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "grunt"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/ferrous-frameworks/ironworks.git"
   },
   "author": "Tyson Hester",
-  "license": "ISC",
+  "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/ferrous-frameworks/ironworks/issues"
   },
   "homepage": "https://github.com/ferrous-frameworks/ironworks.git",
-  "main": "dist/index.js",
   "dependencies": {
     "async": "^1.3.0",
     "findit": "^2.0.0",
     "hapi": "^13.0.0",
     "inert": "^3.2.0",
-    "iron-beam": "^0.0.2",
+    "iron-beam": "*",
     "json-stringify-safe": "^5.0.1",
     "jsonwebtoken": "^5.0.2",
     "lodash": "^3.10.0",
@@ -35,7 +39,6 @@
     "grunt-contrib-clean": "^0.6.0",
     "grunt-contrib-copy": "^0.8.1",
     "grunt-mocha-test": "^0.12.7",
-    "grunt-replace": "^0.11.0",
     "grunt-shell": "^1.1.2",
     "mocha": "2.3.4"
   },

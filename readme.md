@@ -1,3 +1,6 @@
+# ironworks
+[![travis build](https://travis-ci.org/ferrous-frameworks/ironworks.svg?branch=master)](https://travis-ci.org/ferrous-frameworks/ironworks)
+
 # Initial release of ironworks framework.
 
 ## features:

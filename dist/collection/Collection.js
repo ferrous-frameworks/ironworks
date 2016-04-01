@@ -1,3 +1,4 @@
+"use strict";
 var _ = require('lodash');
 var async = require('async');
 var Options = require('../opts/Options');
@@ -107,6 +108,6 @@ var Collection = (function () {
         }
     };
     return Collection;
-})();
+}());
 module.exports = Collection;
 //# sourceMappingURL=Collection.js.map

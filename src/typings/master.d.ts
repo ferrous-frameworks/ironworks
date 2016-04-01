@@ -1,4 +1,4 @@
-///<reference path='./tsd/tsd.d.ts' />
+///<reference path='../../typings/main.d.ts' />
 
 ///<reference path='./uuid/uuid.d.ts' />
 ///<reference path='./json-stringify-safe/json-stringify-safe.d.ts' />
