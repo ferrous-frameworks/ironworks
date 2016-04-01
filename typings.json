@@ -1,0 +1,19 @@
+{
+  "name": "ironworks",
+  "version": false,
+  "ambientDependencies": {
+    "async": "github:DefinitelyTyped/DefinitelyTyped/async/async.d.ts#70737c2a2496f7a13c4da63eb00081cad94d19f1",
+    "form-data": "github:DefinitelyTyped/DefinitelyTyped/form-data/form-data.d.ts#70737c2a2496f7a13c4da63eb00081cad94d19f1",
+    "lodash": "github:DefinitelyTyped/DefinitelyTyped/lodash/lodash.d.ts#70737c2a2496f7a13c4da63eb00081cad94d19f1",
+    "joi": "github:DefinitelyTyped/DefinitelyTyped/joi/joi.d.ts#c50b111ded0a3a18b87b5abffea3150d6aca94da",
+    "socket.io-client": "github:DefinitelyTyped/DefinitelyTyped/socket.io-client/socket.io-client.d.ts#c50b111ded0a3a18b87b5abffea3150d6aca94da",
+    "node": "github:DefinitelyTyped/DefinitelyTyped/node/node.d.ts#bd269cad4cb2b495f940c7b6afc5825d568029be",
+    "bluebird": "github:DefinitelyTyped/DefinitelyTyped/bluebird/bluebird.d.ts#c50b111ded0a3a18b87b5abffea3150d6aca94da",
+    "socket.io": "github:DefinitelyTyped/DefinitelyTyped/socket.io/socket.io.d.ts#c50b111ded0a3a18b87b5abffea3150d6aca94da",
+    "request": "github:DefinitelyTyped/DefinitelyTyped/request/request.d.ts#f999dcd9543265848a33fa3bb8379bf0393d33c8",
+    "chai": "github:DefinitelyTyped/DefinitelyTyped/chai/chai.d.ts#40c60850ad6c8175a62d5ab48c4e016ea5b3dffe",
+    "assertion-error": "github:DefinitelyTyped/DefinitelyTyped/assertion-error/assertion-error.d.ts#40c60850ad6c8175a62d5ab48c4e016ea5b3dffe",
+    "mocha": "github:DefinitelyTyped/DefinitelyTyped/mocha/mocha.d.ts#40c60850ad6c8175a62d5ab48c4e016ea5b3dffe",
+    "hapi": "github:DefinitelyTyped/DefinitelyTyped/hapi/hapi.d.ts#bd269cad4cb2b495f940c7b6afc5825d568029be"
+  }
+}

@@ -1,2 +1,3 @@
-///<reference path="../../typings/tsd/socket.io/socket.io.d.ts"/>
+///<reference path="../../../typings/main/ambient/socket.io/index.d.ts"/>
+"use strict";
 //# sourceMappingURL=ISocketWorker.js.map

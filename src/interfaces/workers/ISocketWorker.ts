@@ -1,4 +1,4 @@
-///<reference path="../../typings/tsd/socket.io/socket.io.d.ts"/>
+///<reference path="../../../typings/main/ambient/socket.io/index.d.ts"/>
 
 import ICommEmit = require('../eventing/ICommEmit');
 

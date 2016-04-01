@@ -1,4 +1,4 @@
-///<reference path="../../typings/tsd/hapi/hapi.d.ts"/>
+///<reference path="../../../typings/main/ambient/hapi/index.d.ts"/>
 import hapi = require('hapi');
 
 import ICommEmit = require('../eventing/ICommEmit');

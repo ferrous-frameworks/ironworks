@@ -1,4 +1,4 @@
-/// <reference path="../../typings/tsd/tsd.d.ts" />
+/// <reference path="../../typings/master.d.ts" />
 
 import chai = require('chai');
 var expect = chai.expect;
