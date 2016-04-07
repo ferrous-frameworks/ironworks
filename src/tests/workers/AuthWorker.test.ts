@@ -1753,9 +1753,9 @@ describe('AuthWorker', () => {
                 cb(null, userAuth);
             });
             var mockRedis = {};
-            other.respond<string, string[]>('request.iw-redis.keys', (pattern, cb) => {
-                expect(_.isString(pattern)).to.be.true;
-                cb(null, [ pattern ]);
+            other.respond<string, string[]>('request.iw-redis.keys', (key, cb) => {
+                expect(_.isString(key)).to.be.true;
+                cb(null, [ mockRedis[key] ]);
             });
             other.respond<string, string[]>('check.iw-redis.set', (set: any, cb) => {
                 expect(_.isString(set.key)).to.be.true;
@@ -1853,9 +1853,9 @@ describe('AuthWorker', () => {
                 cb(null, userAuth);
             });
             var mockRedis = {};
-            other.respond<string, string[]>('request.iw-redis.keys', (pattern, cb) => {
-                expect(_.isString(pattern)).to.be.true;
-                cb(null, []);
+            other.respond<string, string[]>('request.iw-redis.keys', (key, cb) => {
+                expect(_.isString(key)).to.be.true;
+                cb(null, [ mockRedis[key] ]);
             });
             other.respond<string, string[]>('check.iw-redis.set', (set: any, cb) => {
                 expect(_.isString(set.key)).to.be.true;
@@ -1884,6 +1884,153 @@ describe('AuthWorker', () => {
                         setTimeout(() => {
                             cb(null, baseUrl, jar);
                         }, delay * 1000);
+                    },
+                    (baseUrl, jar, cb) => {
+                        var url = baseUrl + 'api/comm/my-other-service/ask/iw-authorized-foo/foo-authorized';
+                        request({
+                            url: url,
+                            method: 'POST',
+                            json: true,
+                            jar: jar
+                        }, (e, res, body) => {
+                            expect(e).to.be.null;
+                            expect(res.statusCode).to.be.equal(200);
+                            expect(!_.isUndefined(res.headers.iw_app_user_data)).to.be.true;
+                            expect(JSON.parse(res.headers.iw_app_user_data).username).to.be.equal(login.username);
+                            expect(body).to.be.equal('bar-authorized');
+                            cb(null);
+                        });
+                    }
+                ], (e) => {
+                    expect(e).to.be.null;
+                    done();
+                });
+            }, done);
+        })
+            .use(new AuthorizedFooWorker())
+            .start();
+    });
+    it("should provide a logout endpoint that removes the refresh token from redis, if redis worker is present", (done) => {
+        var delay = 1;
+        var port = ports.AuthWorker.pop();
+        var privateKey = 'this is a secret key for jwt token signing :)';
+        var login = {
+            username: 'test-user',
+            password: 'pw'
+        };
+        other = createOtherService({
+            environmentObject: {
+                IW_JWT_AUTH_TOKEN: privateKey
+            }
+        }, {
+            port: port,
+            apiRoute: 'api'
+        }, {
+            http: {
+                accessTokenExpiration: delay
+            }
+        }, done, () => {
+            var userAuth:IUserAuth = {
+                username: login.username,
+                issuer: other.whoService,
+                authorization: {
+                    user: {
+                        roles: [{
+                            name: 'iw-auth-tester'
+                        }]
+                    }
+                }
+            };
+            other.respond<ICredentials, IUserAuth>(other.getCommEvent('request.iw-user-validator-test.validate-user-credentials'), (userCreds, cb) => {
+                expect(userCreds.username).to.be.equal(login.username);
+                expect(userCreds.password).to.be.equal(login.password);
+                userAuth.username = userCreds.username;
+                cb(null, userAuth);
+            });
+            other.respond<IUser, IUserAuth>(other.getCommEvent('request.iw-user-validator-test.get-user-auth'), (userCreds, cb) => {
+                expect(userCreds.username).to.be.equal(login.username);
+                userAuth.username = userCreds.username;
+                cb(null, userAuth);
+            });
+            var mockRedis = {};
+            other.respond<string, string[]>('request.iw-redis.keys', (key, cb) => {
+                expect(_.isString(key)).to.be.true;
+                cb(null, [ mockRedis[key] ]);
+            });
+            other.respond<string, string[]>('check.iw-redis.set', (set: any, cb) => {
+                expect(_.isString(set.key)).to.be.true;
+                expect(_.isString(set.value)).to.be.true;
+                mockRedis[set.key] = set.value;
+                cb(null);
+            });
+            other.respond<string, string[]>('request.iw-redis.del', (key, cb) => {
+                expect(_.isString(key)).to.be.true;
+                delete mockRedis[key];
+                cb(null);
+            });
+            other.respond<string, string[]>('check.iw-redis.del-pattern', (key, cb) => {
+                key = key.replace(/\*/g, '');
+                expect(_.isString(key)).to.be.true;
+                var keys = _.filter(_.keys(mockRedis), (redisKey) => {
+                    return _.startsWith(redisKey, key);
+                });
+                _.each(keys, (key) => {
+                    delete mockRedis[key];
+                });
+                cb(null);
+            });
+            primary = createPrimaryService({
+                serviceConnections: [{
+                    name: 'my-other-service',
+                    host: 'localhost',
+                    port: port,
+                    protocol: 'http'
+                }]
+            }, () => {
+                async.waterfall([
+                    (cb) => {
+                        authenticateOverHttp(primary, login, done, cb);
+                    },
+                    (baseUrl, jar, cb) => {
+                        setTimeout(() => {
+                            cb(null, baseUrl, jar);
+                        }, delay * 1000);
+                    },
+                    (baseUrl, jar, cb) => {
+                        var url = baseUrl + 'api/comm/my-other-service/ask/iw-authorized-foo/foo-authorized';
+                        request({
+                            url: url,
+                            method: 'POST',
+                            json: true,
+                            jar: jar
+                        }, (e, res, body) => {
+                            expect(e).to.be.null;
+                            expect(res.statusCode).to.be.equal(200);
+                            expect(jar._jar.store.idx.localhost['/'].access_token.value).to.be.a('string');
+                            expect(jar._jar.store.idx.localhost['/'].refresh_token.value).to.be.a('string');
+                            expect(!_.isUndefined(res.headers.iw_app_user_data)).to.be.true;
+                            expect(JSON.parse(res.headers.iw_app_user_data).username).to.be.equal(login.username);
+                            expect(body).to.be.equal('bar-authorized');
+                            cb(null, baseUrl, jar);
+                        });
+                    },
+                    (baseUrl, jar, cb) => {
+                        var url = baseUrl + 'api/comm/my-other-service/check/iw-auth/logout';
+                        request({
+                            url: url,
+                            method: 'POST',
+                            json: true,
+                            jar: jar,
+                            body: { 
+                                username: login.username
+                            }
+                        }, (e, res) => {
+                            expect(e).to.be.null;
+                            expect(res.statusCode).to.be.equal(200);
+                            expect(jar._jar.store.idx.localhost['/'].access_token.value).to.be.empty;
+                            expect(jar._jar.store.idx.localhost['/'].refresh_token.value).to.be.empty;
+                            cb(null, baseUrl, jar);
+                        });
                     },
                     (baseUrl, jar, cb) => {
                         var url = baseUrl + 'api/comm/my-other-service/ask/iw-authorized-foo/foo-authorized';

@@ -27,6 +27,7 @@ import ICommEventData = require('../interfaces/eventing/ICommEventData');
 import CommEvent = require('../eventing/CommEvent');
 import ICommEvent = require('../interfaces/eventing/ICommEvent');
 import IServiceListener = require('../interfaces/service/IServiceListener');
+import IUser = require('../interfaces/auth/IUser');
 import ICredentials = require('../interfaces/auth/ICredentials');
 import IUserAuth = require('../interfaces/auth/IUserAuth');
 import IRoleTreeElement = require('../interfaces/auth/IRoleTreeElement');
@@ -519,6 +520,19 @@ class AuthWorker extends Worker implements IWorker {
                 cb(new Error('password cannot be blank'));
             }
         });
+        this.verify<IUser>('logout', (user, cb) => {
+            var redisDelPatternListener = _.find<ICommListener>(this.allCommListeners(), (l) => {
+                return l.commEvent.worker.indexOf('iw-redis') === 0 && l.commEvent.method === 'check' && l.commEvent.name === 'del-pattern';
+            });
+            if (!_.isUndefined(redisDelPatternListener)) {
+                this.check(redisDelPatternListener.event, this.getRedisActiveRefreshTokenKey(user.username, '*'), (e) => {
+                    cb(e);
+                });
+            }
+            else {
+                cb(null);
+            }
+        });
         this.getEnvVar(this.httpAuth.clientSecretEnvVarName, (e, clientSecret) => {
             if (e === null) {
                 if (!_.isEmpty(clientSecret)) {
@@ -778,6 +792,7 @@ class AuthWorker extends Worker implements IWorker {
     private setupSecureHttpRoutes(httpServerWorker, cb) {
         this.ask('iw-http-server.route-config', (e, routeConfig: any) => {
             this.setupAuthenticateRoutes(httpServerWorker, routeConfig);
+            this.setupLogoutRoutes(httpServerWorker, routeConfig);
             _.each(this.httpAuth.securedListeners, (l) => {
                 var postRoute = this.createRouteConfig(httpServerWorker, routeConfig.post, l.commEvent, (reply, tokenAuth, e, ...args) => {
                     this.handleHttpReply(reply, e, 'authorization-failed', 'unable to authorize', 403, tokenAuth, args);
@@ -802,6 +817,18 @@ class AuthWorker extends Worker implements IWorker {
 
     private setupAuthenticateRoutes(httpServerWorker, routeConfig) {
         var evt = this.getCommEvent('authenticate', 'request');
+        var postRoute = this.createRouteConfig(httpServerWorker, routeConfig.post, evt, (reply, tokenAuth, e, ...args) => {
+            this.handleHttpReply(reply, e, 'authentication-failed', 'unable to authenticate', 401, tokenAuth, args);
+        });
+        var getRoute = this.createRouteConfig(httpServerWorker, routeConfig.get, evt, (reply, tokenAuth, e, ...args) => {
+            this.handleHttpReply(reply, e, 'authentication-failed', 'unable to authenticate', 401, tokenAuth, args);
+        });
+        httpServerWorker.httpServer.route(postRoute);
+        httpServerWorker.httpServer.route(getRoute);
+    }
+
+    private setupLogoutRoutes(httpServerWorker, routeConfig) {
+        var evt = this.getCommEvent('logout', 'check');
         var postRoute = this.createRouteConfig(httpServerWorker, routeConfig.post, evt, (reply, tokenAuth, e, ...args) => {
             this.handleHttpReply(reply, e, 'authentication-failed', 'unable to authenticate', 401, tokenAuth, args);
         });
@@ -855,6 +882,10 @@ class AuthWorker extends Worker implements IWorker {
             var handleApiReqArgs = [ emit, req, reply, input ];
             if (_.isFunction(cb)) {
                 handleApiReqArgs.push((...args) => {
+                    if (args.length === 1 && emit.worker === this.me.name && emit.name === 'logout') {
+                        (<any>reply).unstate('access_token');
+                        (<any>reply).unstate('refresh_token');
+                    }
                     if (args.length === 2 && emit.worker === this.me.name && emit.name === 'authenticate') {
                         cb.call(this, reply, args[1], args[0]);
                     }
