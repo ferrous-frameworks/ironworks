@@ -471,6 +471,19 @@ var AuthWorker = (function (_super) {
                 cb(new Error('password cannot be blank'));
             }
         });
+        this.verify('logout', function (user, cb) {
+            var redisDelPatternListener = _.find(_this.allCommListeners(), function (l) {
+                return l.commEvent.worker.indexOf('iw-redis') === 0 && l.commEvent.method === 'check' && l.commEvent.name === 'del-pattern';
+            });
+            if (!_.isUndefined(redisDelPatternListener)) {
+                _this.check(redisDelPatternListener.event, _this.getRedisActiveRefreshTokenKey(user.username, '*'), function (e) {
+                    cb(e);
+                });
+            }
+            else {
+                cb(null);
+            }
+        });
         this.getEnvVar(this.httpAuth.clientSecretEnvVarName, function (e, clientSecret) {
             if (e === null) {
                 if (!_.isEmpty(clientSecret)) {
@@ -729,6 +742,7 @@ var AuthWorker = (function (_super) {
         var _this = this;
         this.ask('iw-http-server.route-config', function (e, routeConfig) {
             _this.setupAuthenticateRoutes(httpServerWorker, routeConfig);
+            _this.setupLogoutRoutes(httpServerWorker, routeConfig);
             _.each(_this.httpAuth.securedListeners, function (l) {
                 var postRoute = _this.createRouteConfig(httpServerWorker, routeConfig.post, l.commEvent, function (reply, tokenAuth, e) {
                     var args = [];
@@ -761,6 +775,26 @@ var AuthWorker = (function (_super) {
     AuthWorker.prototype.setupAuthenticateRoutes = function (httpServerWorker, routeConfig) {
         var _this = this;
         var evt = this.getCommEvent('authenticate', 'request');
+        var postRoute = this.createRouteConfig(httpServerWorker, routeConfig.post, evt, function (reply, tokenAuth, e) {
+            var args = [];
+            for (var _i = 3; _i < arguments.length; _i++) {
+                args[_i - 3] = arguments[_i];
+            }
+            _this.handleHttpReply(reply, e, 'authentication-failed', 'unable to authenticate', 401, tokenAuth, args);
+        });
+        var getRoute = this.createRouteConfig(httpServerWorker, routeConfig.get, evt, function (reply, tokenAuth, e) {
+            var args = [];
+            for (var _i = 3; _i < arguments.length; _i++) {
+                args[_i - 3] = arguments[_i];
+            }
+            _this.handleHttpReply(reply, e, 'authentication-failed', 'unable to authenticate', 401, tokenAuth, args);
+        });
+        httpServerWorker.httpServer.route(postRoute);
+        httpServerWorker.httpServer.route(getRoute);
+    };
+    AuthWorker.prototype.setupLogoutRoutes = function (httpServerWorker, routeConfig) {
+        var _this = this;
+        var evt = this.getCommEvent('logout', 'check');
         var postRoute = this.createRouteConfig(httpServerWorker, routeConfig.post, evt, function (reply, tokenAuth, e) {
             var args = [];
             for (var _i = 3; _i < arguments.length; _i++) {
@@ -824,6 +858,10 @@ var AuthWorker = (function (_super) {
                     var args = [];
                     for (var _i = 0; _i < arguments.length; _i++) {
                         args[_i - 0] = arguments[_i];
+                    }
+                    if (args.length === 1 && emit.worker === _this.me.name && emit.name === 'logout') {
+                        reply.unstate('access_token');
+                        reply.unstate('refresh_token');
                     }
                     if (args.length === 2 && emit.worker === _this.me.name && emit.name === 'authenticate') {
                         cb.call(_this, reply, args[1], args[0]);

@@ -139,7 +139,7 @@ new Service('my-api-service')
     })
     .answer('echo-endpoint', (req, cb) => {
         cb(null, req);
-    }) // this will create an endpoint at http://mydomain/api/comm/my-api-service/ask/iw-service/echo-endpoint?some=data
+    }) // this will create an endpoint at http://hostname:9967/api/comm/my-api-service/ask/iw-service/echo-endpoint?some=data
     .start();
 ```
 
