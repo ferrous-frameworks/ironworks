@@ -1,6 +1,4 @@
 
-///<reference path='../typings/master.d.ts' />
-
 import uuid = require('uuid');
 import _ = require('lodash');
 

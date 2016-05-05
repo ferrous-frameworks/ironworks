@@ -1,5 +1,3 @@
-///<reference path='../typings/master.d.ts' />
-"use strict";
 var uuid = require('uuid');
 var _ = require('lodash');
 function newId(v4) {

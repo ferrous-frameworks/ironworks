@@ -1,4 +1,3 @@
-///<reference path='../../typings/master.d.ts' />
 
 import IWorkerChildOpts = require('./IWorkerChildOpts');
 
