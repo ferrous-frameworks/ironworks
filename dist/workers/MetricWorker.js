@@ -1,4 +1,3 @@
-"use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -85,6 +84,6 @@ var MetricWorker = (function (_super) {
         return emit.worker.indexOf('iw-metric') !== 0 && !_.contains(_.invoke(this.ignored, 'getText'), emit.getText());
     };
     return MetricWorker;
-}(Worker));
+})(Worker);
 module.exports = MetricWorker;
 //# sourceMappingURL=MetricWorker.js.map

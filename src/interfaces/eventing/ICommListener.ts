@@ -1,6 +1,4 @@
 
-///<reference path='../../typings/master.d.ts' />
-
 import IronBeam = require('iron-beam');
 
 import IListener = IronBeam.IListener;

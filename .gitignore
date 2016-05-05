@@ -13,3 +13,5 @@ src/**/*.js
 src/**/*.js.map
 
 typings/
+!dist/src/typings
+!dist/typings

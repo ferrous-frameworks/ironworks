@@ -1,4 +1,3 @@
-"use strict";
 var HttpAutoAuthenticationType;
 (function (HttpAutoAuthenticationType) {
     HttpAutoAuthenticationType[HttpAutoAuthenticationType["none"] = 0] = "none";

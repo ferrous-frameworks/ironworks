@@ -1,4 +1,3 @@
-"use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -71,6 +70,6 @@ var EnvironmentWorker = (function (_super) {
         return srvConn.protocol + '://' + srvConn.host + ':' + srvConn.port + '/';
     };
     return EnvironmentWorker;
-}(Worker));
+})(Worker);
 module.exports = EnvironmentWorker;
 //# sourceMappingURL=EnvironmentWorker.js.map

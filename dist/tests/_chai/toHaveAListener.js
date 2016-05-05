@@ -1,4 +1,3 @@
-"use strict";
 var _ = require('lodash');
 module.exports = function (chai, utils) {
     utils.addChainableMethod(chai.Assertion.prototype, 'listener', function (event, count) {

@@ -1,6 +1,4 @@
 
-///<reference path='../typings/master.d.ts' />
-
 import _ = require('lodash');
 
 import Event = require('./Event');

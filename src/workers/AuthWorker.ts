@@ -1,4 +1,5 @@
-///<reference path='../typings/master.d.ts' />
+
+///<reference path='../../typings/main.d.ts' />
 
 import _ = require('lodash');
 import async = require('async');
@@ -658,7 +659,7 @@ class AuthWorker extends Worker implements IWorker {
                                             if (e === null) {
                                                 cb(null, token, false);
                                             }
-                                            else if (e instanceof jwt.TokenExpiredError) {
+                                            else if (e instanceof (<any>jwt).TokenExpiredError) {
                                                 cb(null, void 0, true);
                                             }
                                             else {
@@ -671,7 +672,7 @@ class AuthWorker extends Worker implements IWorker {
                                             if (e === null) {
                                                 cb(null, access, accessExpired, token, false);
                                             }
-                                            else if (e instanceof jwt.TokenExpiredError) {
+                                            else if (e instanceof (<any>jwt).TokenExpiredError) {
                                                 cb(null, access, accessExpired, void 0, true);
                                             }
                                             else {

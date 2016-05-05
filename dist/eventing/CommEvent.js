@@ -1,5 +1,3 @@
-///<reference path='../typings/master.d.ts' />
-"use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -56,6 +54,6 @@ var CommEvent = (function (_super) {
         return prefixMatch && serviceMatch && methodMatch && workerMatch && nameMatch;
     };
     return CommEvent;
-}(Event));
+})(Event);
 module.exports = CommEvent;
 //# sourceMappingURL=CommEvent.js.map

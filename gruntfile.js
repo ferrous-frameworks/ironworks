@@ -176,11 +176,11 @@ module.exports = function(grunt) {
         },
         bump: {
             options: {
-                files: ['package.json'],
+                files: ['package.json', 'typings.json'],
                 updateConfigs: [],
                 commit: true,
                 commitMessage: 'Release v%VERSION%',
-                commitFiles: ['package.json'],
+                commitFiles: ['package.json', 'typings.json'],
                 createTag: true,
                 tagName: 'v%VERSION%',
                 tagMessage: 'Version %VERSION%',
@@ -197,7 +197,11 @@ module.exports = function(grunt) {
                 files: [{
                     expand: true,
                     cwd: 'src/',
-                    src: ['**/*.js', '*.d.ts', '!**/*.test.js'],
+                    src: ['**/*.js', '*.d.ts', '!**/*.test.js' ],
+                    dest: 'dist/'
+                }, {
+                    expand: true,
+                    src: [ 'typings/**/*.*' ],
                     dest: 'dist/'
                 }]
             }
