@@ -1,6 +1,6 @@
 {
   "name": "ironworks",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "main": "dist/ironworks.d.ts",
   "homepage": "https://github.com/ferrous-frameworks/ironworks",
   "ambientDependencies": {
@@ -9,7 +9,7 @@
     "bluebird": "github:DefinitelyTyped/DefinitelyTyped/bluebird/bluebird.d.ts#c50b111ded0a3a18b87b5abffea3150d6aca94da",
     "chai": "github:DefinitelyTyped/DefinitelyTyped/chai/chai.d.ts#40c60850ad6c8175a62d5ab48c4e016ea5b3dffe",
     "form-data": "github:DefinitelyTyped/DefinitelyTyped/form-data/form-data.d.ts#70737c2a2496f7a13c4da63eb00081cad94d19f1",
-    "hapi": "github:DefinitelyTyped/DefinitelyTyped/hapi/hapi.d.ts#bd269cad4cb2b495f940c7b6afc5825d568029be",
+    "hapi": "registry:dt/hapi#13.0.0+20160423150146",
     "iron-beam": "github:ferrous-frameworks/iron-beam/dist/iron-beam.d.ts#d50ef8c3ea1d6a8ddd236034370869af90fc3c0a",
     "iron-tree": "github:ferrous-frameworks/iron-tree/dist/iron-tree.d.ts#4e77de30b8dc371d426172b20c081666234073da",
     "joi": "github:DefinitelyTyped/DefinitelyTyped/joi/joi.d.ts#c50b111ded0a3a18b87b5abffea3150d6aca94da",
