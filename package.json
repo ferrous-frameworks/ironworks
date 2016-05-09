@@ -1,6 +1,6 @@
 {
   "name": "ironworks",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "description": "",
   "main": "dist/index.js",
   "scripts": {
@@ -45,5 +45,8 @@
   "engines": {
     "node": ">=4.2.2",
     "npm": ">=3.0.0"
+  },
+  "typings": {
+    "main": "dist/ironworks.d.ts"
   }
 }
