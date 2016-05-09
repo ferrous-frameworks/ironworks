@@ -1,6 +1,6 @@
 {
   "name": "ironworks",
-  "version": "0.0.12",
+  "version": "0.0.13",
   "main": "dist/ironworks.d.ts",
   "homepage": "https://github.com/ferrous-frameworks/ironworks",
   "ambientDependencies": {
