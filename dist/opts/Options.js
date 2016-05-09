@@ -1,3 +1,4 @@
+"use strict";
 var _ = require('lodash');
 var Options = (function () {
     function Options(defaults) {
@@ -52,6 +53,6 @@ var Options = (function () {
         });
     };
     return Options;
-})();
+}());
 module.exports = Options;
 //# sourceMappingURL=Options.js.map

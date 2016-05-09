@@ -1,3 +1,4 @@
+"use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -13,6 +14,6 @@ var Emit = (function (_super) {
         this.timestamp = new Date().getTime();
     }
     return Emit;
-})(Event);
+}(Event));
 module.exports = Emit;
 //# sourceMappingURL=Emit.js.map
