@@ -46,6 +46,5 @@
   "engines": {
     "node": ">=4.2.2",
     "npm": ">=3.0.0"
-  },
-  "typings": "./dist/ironworks.d.ts"
+  }
 }
