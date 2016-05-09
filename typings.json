@@ -1,6 +1,6 @@
 {
   "name": "ironworks",
-  "version": "0.0.18",
+  "version": "0.0.19",
   "main": "dist/ironworks.d.ts",
   "homepage": "https://github.com/ferrous-frameworks/ironworks",
   "dependencies": {
