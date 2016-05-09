@@ -261,7 +261,7 @@ class AuthWorker extends Worker implements IWorker {
         }
         return _.every(requiredRoles, (requiredRoleOrString) => {
             var requiredRole = AuthWorker.getRoleFromRoleOrString(requiredRoleOrString);
-            return _.any(allUserRoles, (userRoleOrString) => {
+            return (<any>_).any(allUserRoles, (userRoleOrString) => {
                 var userRole = AuthWorker.getRoleFromRoleOrString(userRoleOrString);
                 if (userRole.name !== requiredRole.name) {
                     return false;
@@ -315,7 +315,7 @@ class AuthWorker extends Worker implements IWorker {
             return userRole.name + (!_.isUndefined(emittedRoleStr) ? '[' + emittedRoleStr + ']' : '');
         }).join(', ');
         return new Error('authorization failed - ' + emit.getText() + ' requires ' +
-            _.pluck(requiredRoles, 'name').join(',') + ' role(s); ' + username + ' is a member of ' +
+            (<any>_).pluck(requiredRoles, 'name').join(',') + ' role(s); ' + username + ' is a member of ' +
             userRolesText + ' role(s)');
     }
 
@@ -439,13 +439,13 @@ class AuthWorker extends Worker implements IWorker {
                 return worker.me.name === 'iw-socket';
             });
             socketWorker.socketServer.use((socket, next) => {
-                socket.authentication = {
+                (<any>socket).authentication = {
                     authenticated: false,
                     timeout: false,
                     interservice: false
                 };
                 var timer = setTimeout(() => {
-                    socket.authentication.timeout = true;
+                    (<any>socket).authentication.timeout = true;
                     var reason = "authentication timeout";
                     this.cannotAuthenticate(socket, reason);
                     this.inform('timeout', {
@@ -456,11 +456,11 @@ class AuthWorker extends Worker implements IWorker {
                 }, this.socketAuth.timeout);
                 socket.on(this.getCommEvent('authenticate-interservice', 'check').getText(), (tokenAuth:ITokenAuthentication, cb) => {
                     if (_.isObject(tokenAuth) && !_.isEmpty(tokenAuth.accessToken)) {
-                        if (!socket.authentication.timeout) {
+                        if (!(<any>socket).authentication.timeout) {
                             clearTimeout(timer);
                             if (!_.isEmpty(this.socketAuth.interserviceToken) && _.isEqual(this.socketAuth.interserviceToken, tokenAuth.accessToken)) {
-                                socket.authentication.authenticated = true;
-                                socket.authentication.interservice = true;
+                                (<any>socket).authentication.authenticated = true;
+                                (<any>socket).authentication.interservice = true;
                                 cb(null);
                             }
                             else {
@@ -473,11 +473,11 @@ class AuthWorker extends Worker implements IWorker {
                     }
                 });
                 socket.on(this.getCommEvent('authenticate-creds', 'request').getText(), (creds:ICredentials, cb) => {
-                    if (!socket.authentication.timeout) {
+                    if (!(<any>socket).authentication.timeout) {
                         clearTimeout(timer);
                         this.request<ICredentials, ITokenAuthentication>('authenticate', creds, (e, token) => {
                             if (e === null) {
-                                socket.authentication.authenticated = true;
+                                (<any>socket).authentication.authenticated = true;
                                 cb(null, token.accessToken);
                             }
                             else {
@@ -970,7 +970,7 @@ class AuthWorker extends Worker implements IWorker {
                 commEvent: l.commEvent,
                 annotation: l.annotation
             };
-            if (!_.contains(existingListeners, cl)) {
+            if (!(<any>_).contains(existingListeners, cl)) {
                 this.annotate({
                     internal: true,
                     log: {

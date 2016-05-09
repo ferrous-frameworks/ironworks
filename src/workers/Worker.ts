@@ -148,7 +148,7 @@ class Worker implements IWorker {
     }
 
     public getDependencyNames(): string[] {
-        return _.pluck(_.pluck(this.dependencies.list(), 'me'), 'name');
+        return (<any>_).pluck((<any>_).pluck(this.dependencies.list(), 'me'), 'name');
     }
 
     public getCommEvent(event: ICommEventData|string, method?: string): ICommEvent {
@@ -352,7 +352,7 @@ class Worker implements IWorker {
 
     public listeners(eventName: ICommEventData|string): Function[] {
         var evt = this.getCommEvent(eventName);
-        return _.pluck(this.comm.listeners(evt.getText()), 'method');
+        return (<any>_).pluck(this.comm.listeners(evt.getText()), 'method');
     }
 
     public annotatedListeners(eventName: string, anno?: any): IListener[] {

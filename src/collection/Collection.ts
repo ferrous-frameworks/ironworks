@@ -50,11 +50,11 @@ class Collection<whoType extends IWho> implements ICollection<whoType> {
         async.reduce<whoType, whoType[]>(this.collection, collection, (collection, item, callback) => {
             var match = false;
             var idMatch =
-                _.contains(query.ids, item.me.id)
+                (<any>_).contains(query.ids, item.me.id)
                 || _.isUndefined(query.ids)
                 || query.ids.length === 0;
             var nameMatch =
-                _.contains(query.names, item.me.name)
+                (<any>_).contains(query.names, item.me.name)
                 || _.isUndefined(query.names)
                 || query.names.length === 0;
             if (!_.isUndefined(query.op) && query.op === 'or') {
@@ -80,11 +80,11 @@ class Collection<whoType extends IWho> implements ICollection<whoType> {
         async.reduce<whoType, whoType[]>(this.collection, results, (results, item, cb) => {
             var match = false;
             var idMatch =
-                _.contains(query.ids, item.me.id)
+                (<any>_).contains(query.ids, item.me.id)
                 || _.isUndefined(query.ids)
                 || query.ids.length === 0;
             var nameMatch =
-                _.contains(query.names, item.me.name)
+                (<any>_).contains(query.names, item.me.name)
                 || _.isUndefined(query.names)
                 || query.names.length === 0;
             if (!_.isUndefined(query.op) && query.op === 'or') {

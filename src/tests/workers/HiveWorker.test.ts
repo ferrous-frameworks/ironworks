@@ -285,7 +285,7 @@ describe('HiveWorker', function () {
     }
     function waitOnCalls(calls, cb) {
         async.whilst(function () {
-            return _.any<any>(calls, function (c) {
+            return (<any>_).any(calls, function (c) {
                 return !c.called;
             });
         }, function (cb) {

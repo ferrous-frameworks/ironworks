@@ -246,7 +246,7 @@ class Comm extends Eventer implements IComm {
 
     public listeners(event: ICommEventData|string): Function[] {
         var evt = this.getCommEvent(event);
-        return _.pluck(super.listeners(evt.getText()), 'method');
+        return (<any>_).pluck(super.listeners(evt.getText()), 'method');
     }
 
     public hasListener(event: ICommEventData|string, method?: string): boolean {

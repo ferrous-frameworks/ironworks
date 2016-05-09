@@ -80,7 +80,7 @@ class ConnectorWorker extends Worker implements IWorker {
         this.annotate({
             internal: true
         }).answer('list-external-service-names', (cb) => {
-            cb(null, _.pluck(this.serviceConnections, 'name'));
+            cb(null, (<any>_).pluck(this.serviceConnections, 'name'));
         });
         this.annotate({
             log:{
@@ -88,7 +88,7 @@ class ConnectorWorker extends Worker implements IWorker {
             }
         }).ask<string[]>('iw-service.list-workers', (e, workerNames) => {
             if (e === null) {
-                this.autoConnect = !_.contains(_.pluck(workerNames, 'name'), 'iw-hive');
+                this.autoConnect = !(<any>_).contains((<any>_).pluck(workerNames, 'name'), 'iw-hive');
                 super.init(cb);
             }
             else if (!_.isUndefined(cb)) {
@@ -202,7 +202,7 @@ class ConnectorWorker extends Worker implements IWorker {
 
     private handshakeWithConnectedService(service: IServiceConnection) {
         var options = this.socketIoClientOpts;
-        var secureProtocol = _.any(['wss','https'], (p) => {
+        var secureProtocol = (<any>_).any(['wss','https'], (p) => {
             return p === service.protocol;
         });
         if (secureProtocol || service.port.toString().indexOf("443") !== -1) {

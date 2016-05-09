@@ -94,7 +94,7 @@ class MetricWorker extends Worker implements IWorker {
     }
 
     private shouldIntercept(emit: ICommEmit): boolean {
-        return emit.worker.indexOf('iw-metric') !== 0 && !_.contains(_.invoke(this.ignored, 'getText'), emit.getText());
+        return emit.worker.indexOf('iw-metric') !== 0 && !(<any>_).contains((<any>_).invoke(this.ignored, 'getText'), emit.getText());
     }
 }
 
