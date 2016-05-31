@@ -11,23 +11,23 @@ module.exports = function(grunt) {
 
     var tsBin = path.join(pathToNode, 'lib/node_modules/typescript/bin');
     var nodeBin = path.join(pathToNode, 'bin');
-    
+
     grunt.loadNpmTasks('grunt-mocha-test');
     grunt.loadNpmTasks('grunt-shell');
     grunt.loadNpmTasks('grunt-bump');
 
     grunt.loadNpmTasks('grunt-contrib-copy');
     grunt.loadNpmTasks('grunt-contrib-clean');
-    
-    
+
+
     grunt.initConfig({
         pkg: grunt.file.readJSON('package.json'),
-        
-        
+
+
         nodeBin: nodeBin,
         tscExec: path.join(tsBin, 'tsc'),
-        
-        
+
+
         shell: {
             typings: {
                 command: 'typings install'
@@ -197,7 +197,11 @@ module.exports = function(grunt) {
                 files: [{
                     expand: true,
                     cwd: 'src/',
-                    src: ['**/*.js', '*.d.ts', '!**/*.test.js' ],
+                    src: ['**/*.js', '*.d.ts', '!**/*.test.js'],
+                    dest: 'dist/'
+                }, {
+                    expand: true,
+                    src: 'typings/**/*.*',
                     dest: 'dist/'
                 }]
             }
