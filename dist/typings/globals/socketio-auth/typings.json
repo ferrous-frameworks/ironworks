@@ -1,0 +1,8 @@
+{
+  "resolution": "main",
+  "tree": {
+    "src": "https://raw.githubusercontent.com/ferrous-frameworks/iw-d-socketio-auth/6457c303589f9a54579a4d64cfea56229571f176/socketio-auth.d.ts",
+    "raw": "github:ferrous-frameworks/iw-d-socketio-auth/socketio-auth.d.ts#6457c303589f9a54579a4d64cfea56229571f176",
+    "typings": "https://raw.githubusercontent.com/ferrous-frameworks/iw-d-socketio-auth/6457c303589f9a54579a4d64cfea56229571f176/socketio-auth.d.ts"
+  }
+}

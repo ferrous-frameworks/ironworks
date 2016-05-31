@@ -1,0 +1,8 @@
+{
+  "resolution": "main",
+  "tree": {
+    "src": "https://raw.githubusercontent.com/ferrous-frameworks/iw-d-uuid/66be92d7f6dc8e27bf3877e8b73cd5309d6f933b/uuid.d.ts",
+    "raw": "github:ferrous-frameworks/iw-d-uuid/uuid.d.ts#66be92d7f6dc8e27bf3877e8b73cd5309d6f933b",
+    "typings": "https://raw.githubusercontent.com/ferrous-frameworks/iw-d-uuid/66be92d7f6dc8e27bf3877e8b73cd5309d6f933b/uuid.d.ts"
+  }
+}

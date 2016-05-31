@@ -1,0 +1,56 @@
+{
+  "resolution": "main",
+  "tree": {
+    "src": "/Users/tyson-hester/dev/ironworks/node_modules/iron-beam/package.json",
+    "raw": "npm:iron-beam",
+    "main": "dist/iron-beam.js",
+    "typings": "dist/iron-beam.d.ts",
+    "version": "0.0.22",
+    "global": false,
+    "dependencies": {
+      "async": {
+        "src": "/Users/tyson-hester/dev/ironworks/node_modules/async/package.json",
+        "raw": "npm:async",
+        "main": "lib/async.js",
+        "version": "1.5.2",
+        "global": false,
+        "name": "async"
+      },
+      "iron-tree": {
+        "src": "/Users/tyson-hester/dev/ironworks/node_modules/iron-tree/package.json",
+        "raw": "npm:iron-tree",
+        "main": "dist/iron-tree.js",
+        "version": "0.0.31",
+        "global": false,
+        "dependencies": {
+          "async": {
+            "src": "/Users/tyson-hester/dev/ironworks/node_modules/async/package.json",
+            "raw": "npm:async",
+            "main": "lib/async.js",
+            "version": "1.5.2",
+            "global": false,
+            "name": "async"
+          },
+          "lodash": {
+            "src": "/Users/tyson-hester/dev/ironworks/node_modules/lodash/package.json",
+            "raw": "npm:lodash",
+            "main": "index.js",
+            "version": "3.10.1",
+            "global": false,
+            "name": "lodash"
+          }
+        },
+        "name": "iron-tree"
+      },
+      "lodash": {
+        "src": "/Users/tyson-hester/dev/ironworks/node_modules/lodash/package.json",
+        "raw": "npm:lodash",
+        "main": "index.js",
+        "version": "3.10.1",
+        "global": false,
+        "name": "lodash"
+      }
+    },
+    "name": "iron-beam"
+  }
+}

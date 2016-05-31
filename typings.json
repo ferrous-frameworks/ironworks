@@ -12,7 +12,7 @@
   "devDependencies": {
     "chai": "registry:npm/chai#3.5.0+20160415060238"
   },
-  "ambientDependencies": {
+  "globalDependencies": {
     "async": "registry:dt/async#1.4.2+20160501155344",
     "hapi": "registry:dt/hapi#13.0.0+20160423150146",
     "joi": "registry:dt/joi#6.5.0+20160324101820",
@@ -24,7 +24,7 @@
     "socketio-auth": "github:ferrous-frameworks/iw-d-socketio-auth/socketio-auth.d.ts#6457c303589f9a54579a4d64cfea56229571f176",
     "uuid": "github:ferrous-frameworks/iw-d-uuid/uuid.d.ts#66be92d7f6dc8e27bf3877e8b73cd5309d6f933b"
   },
-  "ambientDevDependencies": {
+  "globalDevDependencies": {
     "mocha": "registry:dt/mocha#2.2.5+20160317120654"
   }
 }

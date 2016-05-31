@@ -1,0 +1,8 @@
+{
+  "resolution": "main",
+  "tree": {
+    "src": "https://raw.githubusercontent.com/ferrous-frameworks/iw-d-json-stringify-safe/5bb6c42c035f276dd7b33ffaaaf762ba232bd732/json-stringify-safe.d.ts",
+    "raw": "github:ferrous-frameworks/iw-d-json-stringify-safe/json-stringify-safe.d.ts#5bb6c42c035f276dd7b33ffaaaf762ba232bd732",
+    "typings": "https://raw.githubusercontent.com/ferrous-frameworks/iw-d-json-stringify-safe/5bb6c42c035f276dd7b33ffaaaf762ba232bd732/json-stringify-safe.d.ts"
+  }
+}
