@@ -1,4 +1,5 @@
 ///<reference path='../../typings/main.d.ts' />
+"use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -986,6 +987,6 @@ var AuthWorker = (function (_super) {
         });
     };
     return AuthWorker;
-})(Worker);
+}(Worker));
 module.exports = AuthWorker;
 //# sourceMappingURL=AuthWorker.js.map

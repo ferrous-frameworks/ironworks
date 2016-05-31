@@ -58,7 +58,7 @@ class HiveWorker extends Worker implements IWorker {
                     },
                     (serviceNames, localListeners, cb) => {
                         async.reduce(serviceNames, [], (allExtListeners, serviceName: string, cb) => {
-                            var circular = _.reduce(_.pluck(emit.scoc, 'name'), (count, name) => {
+                            var circular = _.reduce((<any>_).pluck(emit.scoc, 'name'), (count, name) => {
                                 return this.whoService.name === name ? ++count : count;
                             }, 0) > 2;
                             if (circular) {
@@ -90,16 +90,16 @@ class HiveWorker extends Worker implements IWorker {
                         }, (cb) => {
                             var extListener = allExtListeners.shift();
                             if (!_.isUndefined(extListener)) {
-                                var newWorkerListener = !_.any<IServiceListener>(preferredListeners, (l) => {
+                                var newWorkerListener = !(<any>_).any(preferredListeners, (l) => {
                                     return extListener.commEvent.method === l.commEvent.method
                                         && extListener.commEvent.worker === l.commEvent.worker
                                         && extListener.commEvent.name === l.commEvent.name;
                                 });
-                                var shorterRoute = _.any<IServiceListener>(allExtListeners, (l) => {
+                                var shorterRoute = (<any>_).any(allExtListeners, (l) => {
                                     return extListener.commEvent.method === l.commEvent.method
                                         && extListener.commEvent.worker === l.commEvent.worker
                                         && extListener.commEvent.name === l.commEvent.name
-                                        && _.contains(_.initial(extListener.annotation.smap), l.commEvent.service)
+                                        && (<any>_).contains(_.initial(extListener.annotation.smap), l.commEvent.service)
                                 });
                                 if (newWorkerListener && !shorterRoute) {
                                     preferredListeners.push(extListener);
@@ -126,7 +126,7 @@ class HiveWorker extends Worker implements IWorker {
                                     this[method].apply(this, ([ l.commEvent ]).concat(args));
                                 });
                             }
-                            var alreadyListed = _.any(availableListeners, (l) => {
+                            var alreadyListed = (<any>_).any(availableListeners, (l) => {
                                 return CommEvent.equal(l.commEvent, localCommEvt);
                             });
                             if (!alreadyListed && (isLocal || isNotServiceEvent)) {

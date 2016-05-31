@@ -1,3 +1,4 @@
+"use strict";
 var _ = require('lodash');
 var idHelper = require('../helpers/idHelper');
 var Options = require('../opts/Options');
@@ -310,6 +311,6 @@ var Worker = (function () {
         }
     };
     return Worker;
-})();
+}());
 module.exports = Worker;
 //# sourceMappingURL=Worker.js.map

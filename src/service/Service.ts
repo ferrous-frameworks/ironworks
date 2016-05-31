@@ -117,13 +117,13 @@ class Service extends Worker implements IService {
         });
         this.annotate({ log: { level: 900 } }).answer<IServiceListener[]>('list-local-listeners', (cb) => {
             cb(null, _.reduce<IServiceListener, IServiceListener[]>(this.allCommListeners(), (availableListeners, l) => {
-                if (_.contains(this.autoAnnotateInternalEmitNames, l.commEvent.name)) {
+                if ((<any>_).contains(this.autoAnnotateInternalEmitNames, l.commEvent.name)) {
                     l.annotation = _.extend({
                         internal: true
                     }, l.annotation);
                 }
                 var internal = !_.isUndefined(l.annotation.internal) && l.annotation.internal;
-                var ignored = _.any(this.ignoreWorkerNames, (ignoredWorkerName) => {
+                var ignored = (<any>_).any(this.ignoreWorkerNames, (ignoredWorkerName) => {
                     return l.commEvent.worker.indexOf(ignoredWorkerName) === 0;
                 });
                 if (!internal && !ignored) {
@@ -133,7 +133,7 @@ class Service extends Worker implements IService {
             }, []));
         });
         this.answer<IAm[]>('list-workers', (cb) => {
-            cb(null, _.pluck(this.workers.list(), 'me').concat(this.me));
+            cb(null, (<any>_).pluck(this.workers.list(), 'me').concat(this.me));
         });
         this.annotate({
             internal: true
@@ -349,7 +349,7 @@ class Service extends Worker implements IService {
             }, (e: Error, deps: ICollection<IWorker>) => {
                 if (deps.length() < depNames.length) {
                     cb(new Error(errorPrefix + 'missing - ' +
-                        _.difference(depNames, _.pluck(deps.list(), 'name')).join(', ')
+                        (<any>_).difference(depNames, (<any>_).pluck(deps.list(), 'name')).join(', ')
                     ));
                 }
                 else {

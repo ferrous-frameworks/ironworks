@@ -199,41 +199,12 @@ module.exports = function(grunt) {
                     cwd: 'src/',
                     src: ['**/*.js', '*.d.ts', '!**/*.test.js' ],
                     dest: 'dist/'
-                }, {
-                    expand: true,
-                    src: [ 'typings/**/*.*' ],
-                    dest: 'dist/'
                 }]
             }
         },
         clean: {
             dist: [ "dist" ]
         }
-    });
-
-
-    grunt.registerTask('tsconfig', 'initialize tsconfig.json with the current project files', function () {
-        var done = this.async();
-        tsConfigInit({
-            dirsToCompile: [
-                'src'
-            ],
-            pathToTsConfig: './tsconfig.json'
-        }, function (e, results) {
-            if (_.isUndefined(e)) {
-                grunt.log.subhead('tsconfig.json init results ---');
-                _.each(results.tsFiles, function (tsf) {
-                    grunt.log.ok("included " + tsf);
-                });
-                _.each(results.ignored, function (ignored) {
-                    grunt.log.ok("ignored directory " + ignored);
-                });
-                grunt.log.ok();
-                done();
-                return;
-            }
-            done(e);
-        });
     });
 
 

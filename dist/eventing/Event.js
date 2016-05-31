@@ -1,3 +1,4 @@
+"use strict";
 var Event = (function () {
     function Event(data) {
         this.name = data.name;
@@ -9,6 +10,6 @@ var Event = (function () {
         return this.name === event.name;
     };
     return Event;
-})();
+}());
 module.exports = Event;
 //# sourceMappingURL=Event.js.map

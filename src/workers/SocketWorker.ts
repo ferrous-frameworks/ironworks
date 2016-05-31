@@ -82,7 +82,7 @@ class SocketWorker extends Worker implements ISocketWorker {
 
     private watchForAuthentication(socket) {
         async.whilst(() => {
-            if (!_.contains(_.pluck(this.unauthenticatedSockets, 'id'), socket.id)) {
+            if (!(<any>_).contains((<any>_).pluck(this.unauthenticatedSockets, 'id'), socket.id)) {
                 return false;
             }
             if (_.isUndefined(socket.authentication)) {
@@ -95,7 +95,7 @@ class SocketWorker extends Worker implements ISocketWorker {
             });
         }, (e) => {
             if (e === null) {
-                if (_.contains(_.pluck(this.unauthenticatedSockets, 'id'), socket.id)) {
+                if ((<any>_).contains((<any>_).pluck(this.unauthenticatedSockets, 'id'), socket.id)) {
                     this.monitorSocket(socket);
                 }
             }
@@ -120,7 +120,7 @@ class SocketWorker extends Worker implements ISocketWorker {
             }
             event.data.push(anno);
             var cb = void 0;
-            var callCb = _.any([
+            var callCb = (<any>_).any([
                 'tell',
                 'inform'
             ], (m) => {

@@ -1,3 +1,4 @@
+"use strict";
 var __extends = (this && this.__extends) || function (d, b) {
     for (var p in b) if (b.hasOwnProperty(p)) d[p] = b[p];
     function __() { this.constructor = d; }
@@ -195,6 +196,6 @@ var Eventer = (function (_super) {
         _super.prototype.dispose.call(this, callback);
     };
     return Eventer;
-})(EventEmitter);
+}(EventEmitter));
 module.exports = Eventer;
 //# sourceMappingURL=Eventer.js.map

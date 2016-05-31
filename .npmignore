@@ -11,7 +11,7 @@ iron-tree.iws
 
 gruntfile.js
 tsconfig.json
-typings.json
 
 src/
 typings/
+docs/

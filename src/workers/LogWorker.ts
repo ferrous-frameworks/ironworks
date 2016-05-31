@@ -156,7 +156,7 @@ class LogWorker extends Worker implements IWorker {
 
     private interceptListener(evt: ICommEventData): boolean {
         return this.hasListener(evt)
-            || _.any(this.serviceListeners, (srvListener: IServiceListener) => {
+            || (<any>_).any(this.serviceListeners, (srvListener: IServiceListener) => {
                 return CommEvent.equal(evt, srvListener.commEvent);
             })
             || evt.name === 'error'

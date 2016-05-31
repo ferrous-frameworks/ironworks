@@ -150,7 +150,7 @@ class HttpServerWorker extends Worker implements IHttpServerWorker {
 
     public handleApiReq(emit: ICommEmitData, req: hapi.Request, reply: hapi.IReply, input: any, cb?) {
         var method = emit.method;
-        var hasEvent = _.any(this.serviceListeners, (srvListener: IServiceListener) => {
+        var hasEvent = (<any>_).any(this.serviceListeners, (srvListener: IServiceListener) => {
             return CommEvent.equal(emit, srvListener.commEvent);
         });
         if (!hasEvent) {
