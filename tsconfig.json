@@ -7,14 +7,11 @@
 		"declaration": false
 	},
 	"filesGlob": [
-		"./src/**/*.ts",
-		"typings/index.d.ts"
+		"./src/**/*.ts"
 	],
 	"exclude": [
 		"node_modules",
 		"dist",
-		"typings/browser",
-		"typings/browser.d.ts",
 		".c9"
 	]
 }

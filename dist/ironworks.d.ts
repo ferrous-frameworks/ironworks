@@ -1,4 +1,6 @@
 
+/// <reference path='./typings/index.d.ts' />
+
 declare module "ironworks" {
 	import hapi = require('hapi');
 

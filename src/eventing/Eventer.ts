@@ -67,7 +67,7 @@ class Eventer extends EventEmitter implements IEventer {
         }
         return <IEvent>event;
     }
-    
+
 
     public tell(event: IEmitData|string, anno?: any): boolean {
         var evt = Eventer.getEvent(event);

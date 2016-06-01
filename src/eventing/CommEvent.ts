@@ -52,7 +52,7 @@ class CommEvent extends Event implements ICommEvent {
     public equal(event: ICommEvent): boolean {
         return CommEvent.equal(this, event);
     }
-    
+
     public static equal(evt1: ICommEventData, evt2: ICommEventData): boolean {
         var prefixMatch = evt1.prefix === '*' || evt2.prefix === '*' || evt1.prefix === evt2.prefix;
         var serviceMatch = evt1.service === '*' || evt2.service === '*' || evt1.service === evt2.service;

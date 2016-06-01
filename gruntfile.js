@@ -174,13 +174,13 @@ module.exports = function(grunt) {
                 src: ['src/tests/workers/HttpServerWorker.test.js']
             }
         },
-        bump: {
+		bump: {
             options: {
-                files: ['package.json', 'typings.json'],
+                files: ['package.json'],
                 updateConfigs: [],
                 commit: true,
                 commitMessage: 'Release v%VERSION%',
-                commitFiles: ['package.json', 'typings.json'],
+                commitFiles: ['package.json'],
                 createTag: true,
                 tagName: 'v%VERSION%',
                 tagMessage: 'Version %VERSION%',
@@ -197,11 +197,7 @@ module.exports = function(grunt) {
                 files: [{
                     expand: true,
                     cwd: 'src/',
-                    src: ['**/*.js', '*.d.ts', '!**/*.test.js'],
-                    dest: 'dist/'
-                }, {
-                    expand: true,
-                    src: 'typings/**/*.*',
+                    src: ['**/*.js', '*.d.ts', '!**/*.test.js', 'typings/*.d.ts', 'typings/**/*.d.ts'],
                     dest: 'dist/'
                 }]
             }
@@ -213,7 +209,7 @@ module.exports = function(grunt) {
 
 
     grunt.registerTask('prep', [
-        'shell:typings'
+        //'shell:typings'
     ]);
 
     grunt.registerTask('build', [
