@@ -79,22 +79,29 @@ var LogWorker = (function (_super) {
                     var emitterObjLog = void 0;
                     if (!_.isUndefined(emitterObj)) {
                         emitterObjLog = _.clone(emitterObj);
-                        if (!_.isUndefined(anno.log) && !_.isEmpty(anno.log.properties)) {
-                            _.each(anno.log.properties, function (prop) {
-                                var emittedProp = _.get(emitterObjLog, prop.name);
-                                if (!_.isUndefined(emittedProp)) {
-                                    if (!_.isUndefined(prop.level) && prop.level > _this.level) {
-                                        emittedProp = void 0;
+                        if (!_.isUndefined(anno.log)) {
+                            if (!_.isEmpty(anno.log.properties)) {
+                                _.each(anno.log.properties, function (prop) {
+                                    var emittedProp = _.get(emitterObjLog, prop.name);
+                                    if (!_.isUndefined(emittedProp)) {
+                                        if (!_.isUndefined(prop.level) && prop.level > _this.level) {
+                                            emittedProp = void 0;
+                                        }
+                                        else if (!_.isUndefined(prop.secure) && prop.secure) {
+                                            emittedProp = '*****';
+                                        }
+                                        else if (!_.isUndefined(prop.arrayLengthOnly) && prop.arrayLengthOnly && _.isArray(emittedProp)) {
+                                            emittedProp = 'array[' + emittedProp.length + ']';
+                                        }
+                                        _.set(emitterObjLog, prop.name, emittedProp);
                                     }
-                                    else if (!_.isUndefined(prop.secure) && prop.secure) {
-                                        emittedProp = '*****';
-                                    }
-                                    else if (!_.isUndefined(prop.arrayLengthOnly) && prop.arrayLengthOnly && _.isArray(emittedProp)) {
-                                        emittedProp = 'array[' + emittedProp.length + ']';
-                                    }
-                                    _.set(emitterObjLog, prop.name, emittedProp);
+                                });
+                            }
+                            else if (!_.isEmpty(anno.log.emittedObject)) {
+                                if (!_.isUndefined(anno.log.emittedObject.arrayLengthOnly) && anno.log.emittedObject.arrayLengthOnly && _.isArray(emitterObjLog)) {
+                                    emitterObjLog = 'array[' + emitterObjLog.length + ']';
                                 }
-                            });
+                            }
                         }
                         nextArgs.push(emitterObj);
                         if (!_this.interceptListener(_this.getCommEmit(meta))) {

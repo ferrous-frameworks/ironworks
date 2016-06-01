@@ -314,4 +314,26 @@ describe('LogWorker', function () {
             })
             .start();
     });
+    it("should collapse the logged array value on events annotated with the 'log.emittedObject.arrayLengthOnly'", (done) => {
+        new Service('service-name')
+            .use(new LogWorker({
+                stdout: (str) => {
+                    var obj = JSON.parse(str);
+                    if (obj.meta.worker === 'iw-service' && obj.meta.name === 'test') {
+                        expect(obj.emitted).to.be.equal('array[100]');
+                        done();
+                    }
+                }
+            }))
+            .info<IServiceReady>('ready', (iw) => {
+                iw.service.annotate({
+                    log: {
+                        emittedObject: {
+							arrayLengthOnly: true
+						}
+                    }
+                }).inform('test', _.range(100));
+            })
+            .start();
+    });
 });

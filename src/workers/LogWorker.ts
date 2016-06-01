@@ -97,23 +97,30 @@ class LogWorker extends Worker implements IWorker {
                     var emitterObjLog = void 0;
                     if (!_.isUndefined(emitterObj)) {
                         emitterObjLog = _.clone(emitterObj);
-                        if (!_.isUndefined(anno.log) && !_.isEmpty(anno.log.properties)) {
-                            _.each(anno.log.properties, (prop: any) => {
-                                var emittedProp = (<any>_).get(emitterObjLog, prop.name);
-                                if (!_.isUndefined(emittedProp)) {
-                                    if (!_.isUndefined(prop.level) && prop.level > this.level) {
-                                        emittedProp = void 0;
-                                    }
-                                    else if (!_.isUndefined(prop.secure) && prop.secure) {
-                                        emittedProp = '*****';
-                                    }
-                                    else if (!_.isUndefined(prop.arrayLengthOnly) && prop.arrayLengthOnly && _.isArray(emittedProp)) {
-                                        emittedProp = 'array[' + emittedProp.length + ']';
-                                    }
-                                    (<any>_).set(emitterObjLog, prop.name, emittedProp);
-                                }
-                            });
-                        }
+                        if (!_.isUndefined(anno.log)) {
+							if (!_.isEmpty(anno.log.properties)) {
+	                            _.each(anno.log.properties, (prop: any) => {
+	                                var emittedProp = (<any>_).get(emitterObjLog, prop.name);
+	                                if (!_.isUndefined(emittedProp)) {
+	                                    if (!_.isUndefined(prop.level) && prop.level > this.level) {
+	                                        emittedProp = void 0;
+	                                    }
+	                                    else if (!_.isUndefined(prop.secure) && prop.secure) {
+	                                        emittedProp = '*****';
+	                                    }
+	                                    else if (!_.isUndefined(prop.arrayLengthOnly) && prop.arrayLengthOnly && _.isArray(emittedProp)) {
+	                                        emittedProp = 'array[' + emittedProp.length + ']';
+	                                    }
+	                                    (<any>_).set(emitterObjLog, prop.name, emittedProp);
+	                                }
+	                            });
+	                        }
+							else if (!_.isEmpty(anno.log.emittedObject)) {
+								if (!_.isUndefined(anno.log.emittedObject.arrayLengthOnly) && anno.log.emittedObject.arrayLengthOnly && _.isArray(emitterObjLog)) {
+									emitterObjLog = 'array[' + emitterObjLog.length + ']';
+								}
+							}
+						}
                         nextArgs.push(emitterObj);
                         if (!this.interceptListener(this.getCommEmit(meta))) {
                             cb = void 0;
