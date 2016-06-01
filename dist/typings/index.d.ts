@@ -9,4 +9,4 @@
 /// <reference path="./uuid/index.d.ts" />
 /// <reference path="./request/index.d.ts" />
 
-/// <reference path="../../node_modules/iron-beam/dist/iron-beam.d.ts" />
+/// <reference path="../../../iron-beam/dist/iron-beam.d.ts" />

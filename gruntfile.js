@@ -15,6 +15,7 @@ module.exports = function(grunt) {
     grunt.loadNpmTasks('grunt-mocha-test');
     grunt.loadNpmTasks('grunt-shell');
     grunt.loadNpmTasks('grunt-bump');
+	grunt.loadNpmTasks('grunt-replace');
 
     grunt.loadNpmTasks('grunt-contrib-copy');
     grunt.loadNpmTasks('grunt-contrib-clean');
@@ -204,6 +205,21 @@ module.exports = function(grunt) {
         },
         clean: {
             dist: [ "dist" ]
+        },
+        replace: {
+            dist: {
+                options: {
+                    patterns: [
+                        {
+                            match: /\.\.\/\.\.\/node_modules/,
+                            replacement: "../../.."
+                        }
+                    ]
+                },
+                files: [
+                    {expand: true, flatten: true, src: ['dist/typings/index.d.ts'], dest: 'dist/typings'}
+                ]
+            }
         }
     });
 
@@ -216,6 +232,7 @@ module.exports = function(grunt) {
         'shell:tsc',
         'clean:dist',
         'copy:dist',
+		'replace:dist',
         'shell:addDistToGit'
     ]);
 
