@@ -26,19 +26,13 @@ class EnvironmentWorker extends Worker implements IWorker {
         this.genericConnections = this.opts.get<IGenericConnection[]>('genericConnections');
         this.genericConnections = _.isUndefined(this.genericConnections) ? [] : _.toArray(this.genericConnections);
         this.environmentObject = this.opts.get('environmentObject');
-        this.environmentObject = _.isUndefined(this.environmentObject) ? process.env : this.environmentObject;
+        this.environmentObject = _.isUndefined(this.environmentObject) ? process.env : _.merge(this.environmentObject, process.env);
         var serviceConnections = this.opts.get<IServiceConnection[]>('serviceConnections');
         if (!_.isUndefined(serviceConnections)) {
             this.serviceConnections = _.map(serviceConnections, (srvConn: IServiceConnection) => {
-                var conn: IServiceConnection = {
-                    name: srvConn.name,
-                    protocol: srvConn.protocol,
-                    host: srvConn.host,
-                    port: srvConn.port,
-                    endPoints: srvConn.endPoints,
-                    token: srvConn.token,
+                var conn: IServiceConnection = _.merge(srvConn, {
                     url: EnvironmentWorker.getServiceConnectionUrl(srvConn)
-                };
+                });
                 return conn;
             });
         }

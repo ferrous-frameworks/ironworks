@@ -18,6 +18,7 @@ import ICommEvent = require('../interfaces/eventing/ICommEvent');
 import ICommEventData = require('../interfaces/eventing/ICommEventData');
 import CommEvent = require('../eventing/CommEvent');
 import IDependency = require('../interfaces/workers/IDependency');
+import IDependencyDefinition = require('../interfaces/workers/IDependencyDefinition');
 import ICollection = require('../interfaces/collection/ICollection');
 import Collection = require('../collection/Collection');
 import IWhoQuery = require('../interfaces/whoIAm/IWhoQuery');
@@ -43,18 +44,23 @@ class Worker implements IWorker {
 
     public defaultMaxListeners: number;
 
-    constructor(dependencyNames: string[], whoAmI: IAm, opts: IWorkerChildOpts) {
+    constructor(dependencyNames: (string|IDependencyDefinition)[], whoAmI: IAm, opts: IWorkerChildOpts) {
         var defOpts: IWorkerOpts = {
             dependencies: []
         };
         this.opts = new Options<IWorkerChildOpts>(defOpts);
         this.opts.merge(_.isUndefined(opts) ? void 0 : opts.worker);
 
-        var deps = this.opts.get<string[]>('dependencies');
+        var deps = this.opts.get<any>('dependencies');
         deps = deps.concat(dependencyNames);
         this.dependencies = new Collection<IDependency<IWorker>>(idHelper.newId());
-        _.each(deps, (name) => {
-            this.addDependency(name);
+        _.each(deps, (depDef: string|IDependencyDefinition) => {
+            if (_.isString(depDef)) {
+                this.addDependency(<string>depDef, false);
+            }
+            else {
+                this.addDependency((<any>depDef).name, !_.isUndefined((<any>depDef).optional) && (<any>depDef).optional);
+            }
         });
         this.me = whoAmI;
         this.useOnce = false;
@@ -63,12 +69,13 @@ class Worker implements IWorker {
         this.started = false;
     }
 
-    public addDependency(name: string) {
+    public addDependency(name: string, optional: boolean) {
         this.dependencies.add({
             me: {
                 id: idHelper.newId(),
                 name: name
-            }
+            },
+            optional: optional
         });
     }
 
@@ -147,8 +154,13 @@ class Worker implements IWorker {
         }).tell(step);
     }
 
-    public getDependencyNames(): string[] {
-        return (<any>_).pluck((<any>_).pluck(this.dependencies.list(), 'me'), 'name');
+    public getDependencyDefs(): IDependencyDefinition[] {
+        return _.map(this.dependencies.list(), (dep: IDependency<IWorker>) => {
+            return <IDependencyDefinition>{
+                name: dep.me.name,
+                optional: dep.optional
+            }
+        });
     }
 
     public getCommEvent(event: ICommEventData|string, method?: string): ICommEvent {

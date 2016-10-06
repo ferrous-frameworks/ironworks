@@ -132,9 +132,10 @@ var HttpServerWorker = (function (_super) {
         if (!hasEvent) {
             method = void 0;
         }
-        else if (!_.isNull(req.auth.credentials)) {
+        var authAnno = _.get(req, 'auth.credentials');
+        if (!_.isUndefined(authAnno)) {
             this.annotate({
-                auth: req.auth.credentials
+                auth: authAnno
             });
         }
         switch (method) {
@@ -198,6 +199,15 @@ var HttpServerWorker = (function (_super) {
             };
             this.httpServer.route(postRoute);
             this.httpServer.route(getRoute);
+            this.comm.on('newListener', function (event) {
+                if (_this.getCommEvent(event).name !== 'newListener') {
+                    _this.ask('iw-service.list-listeners', function (e, listeners) {
+                        if (e === null) {
+                            _this.serviceListeners = listeners;
+                        }
+                    });
+                }
+            });
         }
         this.httpServer.start(function (e) {
             if (_.isUndefined(e)) {

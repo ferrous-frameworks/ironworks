@@ -190,7 +190,11 @@ var Service = (function (_super) {
                 });
             },
             function (cb) {
-                _this.ask('list-listeners', function (e, evts) {
+                _this.annotate({
+                    log: {
+                        level: 1000
+                    }
+                }).ask('list-listeners', function (e, evts) {
                     if (e === null) {
                         _this.annotate({
                             log: {
@@ -304,14 +308,18 @@ var Service = (function (_super) {
         ]);
     };
     Service.prototype.getWorkerDeps = function (errorPrefix, worker, cb) {
-        var depNames = worker.getDependencyNames();
-        if (depNames.length > 0) {
+        var depDefs = worker.getDependencyDefs();
+        if (depDefs.length > 0) {
             this.workers.get({
-                names: depNames
+                names: _.pluck(depDefs, 'name')
             }, function (e, deps) {
-                if (deps.length() < depNames.length) {
-                    cb(new Error(errorPrefix + 'missing - ' +
-                        _.difference(depNames, _.pluck(deps.list(), 'name')).join(', ')));
+                var missingRequiredDeps = _.filter(depDefs, function (depDef) {
+                    return !depDef.optional && !_.any(deps.list(), function (dep) {
+                        return dep.me.name === depDef.name;
+                    });
+                });
+                if (!_.isEmpty(missingRequiredDeps)) {
+                    cb(new Error(errorPrefix + 'missing - ' + _.pluck(missingRequiredDeps, 'name')));
                 }
                 else {
                     cb(null, deps);

@@ -115,9 +115,7 @@ declare module "ironworks" {
 	        }
 	    }
 
-	    export interface ISocketWorkerOpts extends IWorkerChildOpts {
-	        secure?: boolean;
-	    }
+	    export interface ISocketWorkerOpts extends IWorkerChildOpts {}
 	}
 	export module auth {
 	    export enum HttpAutoAuthenticationType {
@@ -137,7 +135,7 @@ declare module "ironworks" {
 	        message: string;
 	    }
 	    export interface ICredentials extends IUser {
-	        password: string;
+	        password?: string;
 	    }
 	    export interface IUserAuth extends IUser {
 	        issuer: whoIAm.IAmVersioned;
@@ -174,7 +172,12 @@ declare module "ironworks" {
 	}
 	export module workers {
 	    export interface IDependency<T extends workers.IWorker> extends whoIAm.IWho {
-	        value?: T;
+    		optional?: boolean;
+	    }
+	    
+	    export interface IDependencyDefinition {
+	    	name: string;
+	    	optional?: boolean;
 	    }
 
 	    export interface IHiveHeartbeat {
@@ -244,7 +247,7 @@ declare module "ironworks" {
 	        start(dependencies?:collection.ICollection<IWorker>, callback?:(e:Error) => void): IWorker;
 	        postStart(dependencies?:collection.ICollection<IWorker>, callback?:(e:Error) => void): IWorker;
 
-	        getDependencyNames(): string[];
+	        getDependencyDefs(): IDependencyDefinition[];
 
 	        hasListener(event:eventing.ICommEventData|string, method?:string): boolean;
 	        allCommListeners(): eventing.ICommListener[];
@@ -325,7 +328,7 @@ declare module "ironworks" {
 
 	        public defaultMaxListeners:number;
 
-	        constructor(dependencyNames:string[], whoAmI:whoIAm.IAm, opts:options.IWorkerChildOpts);
+	        constructor(dependencyNames:(string|IDependencyDefinition)[], whoAmI:whoIAm.IAm, opts:options.IWorkerChildOpts);
 
 	        public addDependency(name:string);
 
@@ -341,7 +344,7 @@ declare module "ironworks" {
 
 	        public postStart(dependencies?:collection.ICollection<IWorker>, callback?:(e:Error) => void):IWorker;
 
-	        public getDependencyNames():string[];
+	        public getDependencyDefs():IDependencyDefinition[];;
 
 	        public getCommEvent(event:eventing.ICommEventData|string, method?:string):eventing.ICommEvent;
 

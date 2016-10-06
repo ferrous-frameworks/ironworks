@@ -21,19 +21,13 @@ var EnvironmentWorker = (function (_super) {
         this.genericConnections = this.opts.get('genericConnections');
         this.genericConnections = _.isUndefined(this.genericConnections) ? [] : _.toArray(this.genericConnections);
         this.environmentObject = this.opts.get('environmentObject');
-        this.environmentObject = _.isUndefined(this.environmentObject) ? process.env : this.environmentObject;
+        this.environmentObject = _.isUndefined(this.environmentObject) ? process.env : _.merge(this.environmentObject, process.env);
         var serviceConnections = this.opts.get('serviceConnections');
         if (!_.isUndefined(serviceConnections)) {
             this.serviceConnections = _.map(serviceConnections, function (srvConn) {
-                var conn = {
-                    name: srvConn.name,
-                    protocol: srvConn.protocol,
-                    host: srvConn.host,
-                    port: srvConn.port,
-                    endPoints: srvConn.endPoints,
-                    token: srvConn.token,
+                var conn = _.merge(srvConn, {
                     url: EnvironmentWorker.getServiceConnectionUrl(srvConn)
-                };
+                });
                 return conn;
             });
         }

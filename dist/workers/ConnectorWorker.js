@@ -96,7 +96,7 @@ var ConnectorWorker = (function (_super) {
             }).confirm('connect-to-external-services', function (e) {
                 if (e === null) {
                     if (!_.isEmpty(_this.serviceConnections)) {
-                        _this.intercept('inform.iw-service.available-listeners', {
+                        _this.intercept('ask.iw-service.list-listeners', {
                             preEmit: function (stop, next, anno) {
                                 var args = [];
                                 for (var _i = 3; _i < arguments.length; _i++) {

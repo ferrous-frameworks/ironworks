@@ -16,17 +16,17 @@ var LogWorker = (function (_super) {
             id: idHelper.newId(),
             name: 'iw-log'
         }, opts);
-        if (_.isUndefined(opts) || (_.isUndefined(opts.stdout) && _.isUndefined(LogWorker.writeStdout))) {
-            LogWorker.writeStdout = console.log;
+        if (_.isUndefined(opts) || (_.isUndefined(opts.stdout) && _.isUndefined(this.writeStdout))) {
+            this.writeStdout = console.log;
         }
         else {
-            LogWorker.writeStdout = opts.stdout;
+            this.writeStdout = opts.stdout;
         }
-        if (_.isUndefined(opts) || (_.isUndefined(opts.stderr) && _.isUndefined(LogWorker.writeStderr))) {
-            LogWorker.writeStderr = console.error;
+        if (_.isUndefined(opts) || (_.isUndefined(opts.stderr) && _.isUndefined(this.writeStderr))) {
+            this.writeStderr = console.error;
         }
         else {
-            LogWorker.writeStderr = opts.stderr;
+            this.writeStderr = opts.stderr;
         }
         var defOpts = {
             level: 500,
@@ -104,15 +104,12 @@ var LogWorker = (function (_super) {
                             }
                         }
                         nextArgs.push(emitterObj);
-                        if (!_this.interceptListener(_this.getCommEmit(meta))) {
-                            cb = void 0;
-                        }
-                        if (_.isUndefined(cb)) {
+                        if (!_this.interceptListener(_this.getCommEvent(meta)) || _.isUndefined(cb)) {
                             if (emitterObj instanceof Error) {
-                                LogWorker.error(meta, anno, emitterObj);
+                                _this.error(meta, anno, emitterObj);
                             }
                             else {
-                                LogWorker.log(meta, anno, emitterObjLog);
+                                _this.log(meta, anno, emitterObjLog);
                             }
                         }
                     }
@@ -128,16 +125,16 @@ var LogWorker = (function (_super) {
                                 listenerRes = listenerArgs[1];
                             }
                             if (e !== null) {
-                                LogWorker.error(meta, anno, e, emitterObj);
+                                _this.error(meta, anno, e, emitterObj);
                             }
                             else {
-                                LogWorker.log(meta, anno, emitterObjLog, listenerRes);
+                                _this.log(meta, anno, emitterObjLog, listenerRes);
                             }
                             cb(e, listenerRes);
                         });
                     }
                     else if (_.isUndefined(emitterObj)) {
-                        LogWorker.log(meta, anno);
+                        _this.log(meta, anno);
                     }
                     next(nextArgs);
                 }
@@ -145,6 +142,19 @@ var LogWorker = (function (_super) {
         });
         _super.prototype.preInit.call(this, comm, whoService, cb);
         return this;
+    };
+    LogWorker.prototype.postInit = function (deps, cb) {
+        var _this = this;
+        this.comm.on('newListener', function (event) {
+            if (_this.getCommEvent(event).name !== 'newListener') {
+                _this.ask('iw-service.list-listeners', function (e, listeners) {
+                    if (e === null) {
+                        _this.serviceListeners = listeners;
+                    }
+                });
+            }
+        });
+        return _super.prototype.postInit.call(this, deps, cb);
     };
     LogWorker.prototype.interceptListener = function (evt) {
         return this.hasListener(evt)
@@ -154,7 +164,8 @@ var LogWorker = (function (_super) {
             || evt.name === 'error'
             || evt.name === 'warn';
     };
-    LogWorker.log = function (meta, anno, emitterObj, listenerRes) {
+    LogWorker.prototype.log = function (meta, anno, emitterObj, listenerRes) {
+        var _this = this;
         process.nextTick(function () {
             var entry = {
                 meta: meta,
@@ -164,13 +175,14 @@ var LogWorker = (function (_super) {
                 entry.emitted = emitterObj;
             }
             if (!_.isUndefined(listenerRes)) {
-                entry.result = listenerRes;
+                entry.emitted = listenerRes;
             }
             var json = JsonStringifySafe(entry);
-            LogWorker.writeStdout(json);
+            _this.writeStdout(json);
         });
     };
-    LogWorker.error = function (meta, anno, error, emitterObj) {
+    LogWorker.prototype.error = function (meta, anno, error, emitterObj) {
+        var _this = this;
         process.nextTick(function () {
             var entry = {
                 meta: meta,
@@ -180,16 +192,20 @@ var LogWorker = (function (_super) {
                 if (error instanceof Error) {
                     entry.error = error.message;
                     entry.stack = error.stack.substring(error.stack.indexOf('at', 7 + error.message.length));
+                    entry = _.merge(entry, _.omit(error, ['message', 'stack']));
                 }
                 if (_.isString(error)) {
                     entry.error = error;
+                }
+                if (_.isObject(error)) {
+                    entry = _.merge(entry, error);
                 }
             }
             if (!_.isUndefined(emitterObj)) {
                 entry.emitted = emitterObj;
             }
             var json = JsonStringifySafe(entry);
-            LogWorker.writeStderr(json);
+            _this.writeStderr(json);
         });
     };
     return LogWorker;

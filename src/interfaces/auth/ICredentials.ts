@@ -2,7 +2,7 @@
 import IUser = require('./IUser');
 
 interface ICredentials extends IUser {
-    password: string;
+    password?: string;
 }
 
 export = ICredentials;

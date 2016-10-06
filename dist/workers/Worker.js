@@ -16,8 +16,13 @@ var Worker = (function () {
         var deps = this.opts.get('dependencies');
         deps = deps.concat(dependencyNames);
         this.dependencies = new Collection(idHelper.newId());
-        _.each(deps, function (name) {
-            _this.addDependency(name);
+        _.each(deps, function (depDef) {
+            if (_.isString(depDef)) {
+                _this.addDependency(depDef, false);
+            }
+            else {
+                _this.addDependency(depDef.name, !_.isUndefined(depDef.optional) && depDef.optional);
+            }
         });
         this.me = whoAmI;
         this.useOnce = false;
@@ -25,12 +30,13 @@ var Worker = (function () {
         this.preStarted = false;
         this.started = false;
     }
-    Worker.prototype.addDependency = function (name) {
+    Worker.prototype.addDependency = function (name, optional) {
         this.dependencies.add({
             me: {
                 id: idHelper.newId(),
                 name: name
-            }
+            },
+            optional: optional
         });
     };
     Worker.prototype.preInit = function (comm, whoService, callback) {
@@ -101,8 +107,13 @@ var Worker = (function () {
             }
         }).tell(step);
     };
-    Worker.prototype.getDependencyNames = function () {
-        return _.pluck(_.pluck(this.dependencies.list(), 'me'), 'name');
+    Worker.prototype.getDependencyDefs = function () {
+        return _.map(this.dependencies.list(), function (dep) {
+            return {
+                name: dep.me.name,
+                optional: dep.optional
+            };
+        });
     };
     Worker.prototype.getCommEvent = function (event, method) {
         if (typeof event === 'string') {

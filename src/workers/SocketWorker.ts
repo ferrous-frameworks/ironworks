@@ -28,9 +28,6 @@ import ISocketWorker = require('../interfaces/workers/ISocketWorker');
 import ISocketWorkerOpts = require('../interfaces/opts/ISocketWorkerOpts');
 
 class SocketWorker extends Worker implements ISocketWorker {
-    private unauthenticatedSockets: any[];
-    private secure: boolean;
-
     public socketServer: any;
 
     constructor(opts?: ISocketWorkerOpts) {
@@ -41,69 +38,19 @@ class SocketWorker extends Worker implements ISocketWorker {
             name: 'iw-socket'
         }, opts);
 
-        var defOpts: ISocketWorkerOpts = {
-            secure: false
-        };
+        var defOpts: ISocketWorkerOpts = {};
         this.opts = this.opts.beAdoptedBy<ISocketWorkerOpts>(defOpts, 'worker');
         this.opts.merge(opts);
-
-        this.secure = this.opts.get<boolean>('secure');
-        this.unauthenticatedSockets = [];
-    }
-
-    public init(cb): IWorker {
-        this.annotate({
-            internal: true
-        }).ack('secure', (cb) => {
-            this.secure = true;
-            cb(null);
-        });
-        return super.init(cb);
     }
 
     public postInit(dependencies: ICollection<IWorker>, callback?: (e: Error) => void): IWorker {
         this.socketServer = io((<IHttpServerWorker> dependencies.list()[0]).httpServer.listener);
         this.socketServer.use(ioWildcard);
         this.socketServer.on('connection', (socket) => {
-            socket.on('disconnect', () => {
-                this.removeUnauthenticatedSocket(socket.id);
-            });
-            if (this.secure) {
-                this.unauthenticatedSockets.push(socket);
-                this.watchForAuthentication(socket);
-            }
-            else {
-                this.monitorSocket(socket);
-            }
+            this.monitorSocket(socket);
         });
         super.postInit(dependencies, callback);
         return this;
-    }
-
-    private watchForAuthentication(socket) {
-        async.whilst(() => {
-            if (!(<any>_).contains((<any>_).pluck(this.unauthenticatedSockets, 'id'), socket.id)) {
-                return false;
-            }
-            if (_.isUndefined(socket.authentication)) {
-                return true;
-            }
-            return !socket.authentication.authenticated && !socket.authentication.timeout;
-        }, (cb) => {
-            setImmediate(() => {
-                cb(null);
-            });
-        }, (e) => {
-            if (e === null) {
-                if ((<any>_).contains((<any>_).pluck(this.unauthenticatedSockets, 'id'), socket.id)) {
-                    this.monitorSocket(socket);
-                }
-            }
-            else {
-                this.inform<Error>('error', e);
-            }
-            this.removeUnauthenticatedSocket(socket.id);
-        });
     }
 
     private monitorSocket(socket) {
@@ -129,14 +76,25 @@ class SocketWorker extends Worker implements ISocketWorker {
             if (callCb) {
                 cb = event.data.pop();
             }
-            if (this.secure) {
-                _.merge(anno, {
-                    auth: {
-                        authentication: {
-                            interservice: socket.authentication.interservice
-                        }
+            if (!_.isUndefined(socket.iwAuth)) {
+                _.set(anno, 'auth.authentication.authenticated', socket.iwAuth.authentication.authenticated);
+                if (!_.isUndefined(socket.iwAuth.authorization)) {
+                    var authorizationAnno = <any[]>_.get(anno, 'auth.authorization');
+                    if (_.isUndefined(authorizationAnno)) {
+                        authorizationAnno = [];
                     }
-                });
+                    else if (_.isObject(authorizationAnno)) {
+                        authorizationAnno = [ authorizationAnno ];
+                    }
+                    var match = _.remove(authorizationAnno, (authorization) => {
+                        return authorization.type === socket.iwAuth.authorization.type;
+                    });
+                    if (_.isUndefined(match)) {
+                        authorizationAnno.push(socket.iwAuth.authorization);
+                    }
+                    authorizationAnno.push(socket.iwAuth.authorization);
+                    _.set(anno, 'auth.authorization', authorizationAnno);
+                }
             }
             this[emit.method].apply(this, [ emit ].concat(event.data));
             if (callCb) {
@@ -145,25 +103,10 @@ class SocketWorker extends Worker implements ISocketWorker {
         });
     }
 
-    private removeUnauthenticatedSocket(id) {
-        var removed = void 0;
-        this.unauthenticatedSockets = _.filter(this.unauthenticatedSockets, (socket) => {
-            var toRemove = id === socket.id;
-            if (toRemove) {
-                removed = socket;
-            }
-            return !toRemove;
-        });
-        return removed;
-    }
-
     public dispose(callback?: () => void) {
         if (!_.isUndefined(this.socketServer)) {
             this.socketServer.close();
         }
-        _.each(this.unauthenticatedSockets, (socket) => {
-            socket.disconnect(true);
-        });
         if (!_.isUndefined(callback)) {
             process.nextTick(() => {
                 callback();

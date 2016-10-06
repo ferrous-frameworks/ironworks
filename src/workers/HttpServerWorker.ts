@@ -156,9 +156,10 @@ class HttpServerWorker extends Worker implements IHttpServerWorker {
         if (!hasEvent) {
             method = void 0;
         }
-        else if (!_.isNull(req.auth.credentials)) {
+        var authAnno = _.get(req, 'auth.credentials');
+        if (!_.isUndefined(authAnno)) {
             this.annotate({
-                auth: req.auth.credentials
+                auth: authAnno
             });
         }
         switch (method) {
@@ -197,7 +198,6 @@ class HttpServerWorker extends Worker implements IHttpServerWorker {
     }
 
     private handleApiReqCallback(cb, reply, ...args) {
-
         if (_.isFunction(cb)) {
             cb.apply(void 0, args);
         }
@@ -220,6 +220,15 @@ class HttpServerWorker extends Worker implements IHttpServerWorker {
             };
             this.httpServer.route(postRoute);
             this.httpServer.route(getRoute);
+            this.comm.on('newListener', (event) => {
+                if (this.getCommEvent(event).name !== 'newListener') {
+                    this.ask<IServiceListener[]>('iw-service.list-listeners', (e, listeners) => {
+                        if (e === null) {
+                            this.serviceListeners = listeners;
+                        }
+                    });
+                }
+            });
         }
         this.httpServer.start((e) => {
             if (_.isUndefined(e)) {

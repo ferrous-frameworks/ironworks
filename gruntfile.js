@@ -102,6 +102,15 @@ module.exports = function(grunt) {
                 },
                 src: ['src/tests/workers/AuthWorker.test.js']
             },
+            auth2: {
+                options: {
+                    colors: true,
+                    log: true,
+                    logErrors: true,
+                    timeout: 60000
+                },
+                src: ['src/tests/workers/AuthWorker2.test.js']
+            },
             socket: {
                 options: {
                     colors: true,

@@ -230,7 +230,11 @@ class Service extends Worker implements IService {
                 });
             },
             (cb) => {
-                this.ask<IServiceListener[]>('list-listeners', (e, evts) => {
+                this.annotate({
+                    log: {
+                        level: 1000
+                    }
+                }).ask<IServiceListener[]>('list-listeners', (e, evts) => {
                     if (e === null) {
                         this.annotate({
                             log: {
@@ -342,15 +346,18 @@ class Service extends Worker implements IService {
     }
 
     private getWorkerDeps(errorPrefix: string, worker: IWorker, cb: (e: Error, workers?: ICollection<IWorker>) => void) {
-        var depNames = worker.getDependencyNames();
-        if (depNames.length > 0) {
+        var depDefs = worker.getDependencyDefs();
+        if (depDefs.length > 0) {
             this.workers.get({
-                names: depNames
+                names: (<any>_).pluck(depDefs, 'name')
             }, (e: Error, deps: ICollection<IWorker>) => {
-                if (deps.length() < depNames.length) {
-                    cb(new Error(errorPrefix + 'missing - ' +
-                        (<any>_).difference(depNames, (<any>_).pluck(deps.list(), 'name')).join(', ')
-                    ));
+                var missingRequiredDeps = _.filter(depDefs, (depDef) => {
+                    return !depDef.optional && !(<any>_).any(deps.list(), (dep) => {
+                        return dep.me.name === depDef.name;
+                    });
+                });
+                if (!_.isEmpty(missingRequiredDeps)) {
+                    cb(new Error(errorPrefix + 'missing - ' + (<any>_).pluck(missingRequiredDeps, 'name')));
                 }
                 else {
                     cb(null, deps);

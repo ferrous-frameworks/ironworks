@@ -9,6 +9,9 @@ interface IServiceConnection extends IConnection {
     token?: string;
     data?: any;
     type?:string;
+    
+    id?: string;
+    password?: string;
 }
 
 export = IServiceConnection;

@@ -5,7 +5,6 @@ var __extends = (this && this.__extends) || function (d, b) {
     d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
 };
 var _ = require('lodash');
-var async = require('async');
 var io = require('socket.io');
 var ioWildcard = require('socketio-wildcard')();
 var idHelper = require('../helpers/idHelper');
@@ -19,68 +18,19 @@ var SocketWorker = (function (_super) {
             id: idHelper.newId(),
             name: 'iw-socket'
         }, opts);
-        var defOpts = {
-            secure: false
-        };
+        var defOpts = {};
         this.opts = this.opts.beAdoptedBy(defOpts, 'worker');
         this.opts.merge(opts);
-        this.secure = this.opts.get('secure');
-        this.unauthenticatedSockets = [];
     }
-    SocketWorker.prototype.init = function (cb) {
-        var _this = this;
-        this.annotate({
-            internal: true
-        }).ack('secure', function (cb) {
-            _this.secure = true;
-            cb(null);
-        });
-        return _super.prototype.init.call(this, cb);
-    };
     SocketWorker.prototype.postInit = function (dependencies, callback) {
         var _this = this;
         this.socketServer = io(dependencies.list()[0].httpServer.listener);
         this.socketServer.use(ioWildcard);
         this.socketServer.on('connection', function (socket) {
-            socket.on('disconnect', function () {
-                _this.removeUnauthenticatedSocket(socket.id);
-            });
-            if (_this.secure) {
-                _this.unauthenticatedSockets.push(socket);
-                _this.watchForAuthentication(socket);
-            }
-            else {
-                _this.monitorSocket(socket);
-            }
+            _this.monitorSocket(socket);
         });
         _super.prototype.postInit.call(this, dependencies, callback);
         return this;
-    };
-    SocketWorker.prototype.watchForAuthentication = function (socket) {
-        var _this = this;
-        async.whilst(function () {
-            if (!_.contains(_.pluck(_this.unauthenticatedSockets, 'id'), socket.id)) {
-                return false;
-            }
-            if (_.isUndefined(socket.authentication)) {
-                return true;
-            }
-            return !socket.authentication.authenticated && !socket.authentication.timeout;
-        }, function (cb) {
-            setImmediate(function () {
-                cb(null);
-            });
-        }, function (e) {
-            if (e === null) {
-                if (_.contains(_.pluck(_this.unauthenticatedSockets, 'id'), socket.id)) {
-                    _this.monitorSocket(socket);
-                }
-            }
-            else {
-                _this.inform('error', e);
-            }
-            _this.removeUnauthenticatedSocket(socket.id);
-        });
     };
     SocketWorker.prototype.monitorSocket = function (socket) {
         var _this = this;
@@ -106,14 +56,25 @@ var SocketWorker = (function (_super) {
             if (callCb) {
                 cb = event.data.pop();
             }
-            if (_this.secure) {
-                _.merge(anno, {
-                    auth: {
-                        authentication: {
-                            interservice: socket.authentication.interservice
-                        }
+            if (!_.isUndefined(socket.iwAuth)) {
+                _.set(anno, 'auth.authentication.authenticated', socket.iwAuth.authentication.authenticated);
+                if (!_.isUndefined(socket.iwAuth.authorization)) {
+                    var authorizationAnno = _.get(anno, 'auth.authorization');
+                    if (_.isUndefined(authorizationAnno)) {
+                        authorizationAnno = [];
                     }
-                });
+                    else if (_.isObject(authorizationAnno)) {
+                        authorizationAnno = [authorizationAnno];
+                    }
+                    var match = _.remove(authorizationAnno, function (authorization) {
+                        return authorization.type === socket.iwAuth.authorization.type;
+                    });
+                    if (_.isUndefined(match)) {
+                        authorizationAnno.push(socket.iwAuth.authorization);
+                    }
+                    authorizationAnno.push(socket.iwAuth.authorization);
+                    _.set(anno, 'auth.authorization', authorizationAnno);
+                }
             }
             _this[emit.method].apply(_this, [emit].concat(event.data));
             if (callCb) {
@@ -121,24 +82,10 @@ var SocketWorker = (function (_super) {
             }
         });
     };
-    SocketWorker.prototype.removeUnauthenticatedSocket = function (id) {
-        var removed = void 0;
-        this.unauthenticatedSockets = _.filter(this.unauthenticatedSockets, function (socket) {
-            var toRemove = id === socket.id;
-            if (toRemove) {
-                removed = socket;
-            }
-            return !toRemove;
-        });
-        return removed;
-    };
     SocketWorker.prototype.dispose = function (callback) {
         if (!_.isUndefined(this.socketServer)) {
             this.socketServer.close();
         }
-        _.each(this.unauthenticatedSockets, function (socket) {
-            socket.disconnect(true);
-        });
         if (!_.isUndefined(callback)) {
             process.nextTick(function () {
                 callback();

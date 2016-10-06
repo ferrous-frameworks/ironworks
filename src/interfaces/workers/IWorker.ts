@@ -11,6 +11,7 @@ import ICommEventData = require('../eventing/ICommEventData');
 import ICommEmitData = require('../eventing/ICommEmitData');
 import ICommEvent = require('../eventing/ICommEvent');
 import ICommEmit = require('../eventing/ICommEmit');
+import IDependencyDefinition = require('../workers/IDependencyDefinition');
 
 import IEventer = require('../eventing/IEventer');
 
@@ -29,14 +30,14 @@ interface IWorker extends IWho, IEventer {
     start(dependencies?: ICollection<IWorker>, callback?: (e: Error) => void): IWorker;
     postStart(dependencies?: ICollection<IWorker>, callback?: (e: Error) => void): IWorker;
 
-    getDependencyNames(): string[];
+    getDependencyDefs(): IDependencyDefinition[];
 
     hasListener(event: ICommEventData|string, method?: string): boolean;
     allCommListeners(): ICommListener[];
     getCommEvent(event: ICommEventData|string, method?: string): ICommEvent;
     getCommEmit(event: ICommEventData|ICommEmitData|string, method?: string): ICommEmit;
 
-    addDependency(name: string);
+    addDependency(name: string, optional: boolean);
 
     tell(
         event: ICommEmitData|string,

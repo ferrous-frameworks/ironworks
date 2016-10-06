@@ -21,8 +21,8 @@ import ILogEntry = require('../interfaces/workers/ILogEntry');
 import Worker = require('./Worker');
 
 class LogWorker extends Worker implements IWorker {
-    private static writeStdout: Function;
-    private static writeStderr: Function;
+    private writeStdout: Function;
+    private writeStderr: Function;
 
     private level: number;
     private defLevel: number;
@@ -34,18 +34,18 @@ class LogWorker extends Worker implements IWorker {
             id: idHelper.newId(),
             name: 'iw-log'
         }, opts);
-
-        if (_.isUndefined(opts) || (_.isUndefined(opts.stdout) && _.isUndefined(LogWorker.writeStdout))) {
-            LogWorker.writeStdout = console.log;
+        
+        if (_.isUndefined(opts) || (_.isUndefined(opts.stdout) && _.isUndefined(this.writeStdout))) {
+            this.writeStdout = console.log;
         }
         else {
-            LogWorker.writeStdout = opts.stdout;
+            this.writeStdout = opts.stdout;
         }
-        if (_.isUndefined(opts) || (_.isUndefined(opts.stderr) && _.isUndefined(LogWorker.writeStderr))) {
-            LogWorker.writeStderr = console.error;
+        if (_.isUndefined(opts) || (_.isUndefined(opts.stderr) && _.isUndefined(this.writeStderr))) {
+            this.writeStderr = console.error;
         }
         else {
-            LogWorker.writeStderr = opts.stderr;
+            this.writeStderr = opts.stderr;
         }
 
         var defOpts: ILogWorkerOpts = {
@@ -122,15 +122,12 @@ class LogWorker extends Worker implements IWorker {
 							}
 						}
                         nextArgs.push(emitterObj);
-                        if (!this.interceptListener(this.getCommEmit(meta))) {
-                            cb = void 0;
-                        }
-                        if (_.isUndefined(cb)) {
+                        if (!this.interceptListener(this.getCommEvent(meta)) || _.isUndefined(cb)) {
                             if (emitterObj instanceof Error) {
-                                LogWorker.error(meta, anno, emitterObj);
+                                this.error(meta, anno, emitterObj);
                             }
                             else {
-                                LogWorker.log(meta, anno, emitterObjLog);
+                                this.log(meta, anno, emitterObjLog);
                             }
                         }
                     }
@@ -142,16 +139,16 @@ class LogWorker extends Worker implements IWorker {
                                 listenerRes = listenerArgs[1];
                             }
                             if (e !== null) {
-                                LogWorker.error(meta, anno, e, emitterObj);
+                                this.error(meta, anno, e, emitterObj);
                             }
                             else {
-                                LogWorker.log(meta, anno, emitterObjLog, listenerRes);
+                                this.log(meta, anno, emitterObjLog, listenerRes);
                             }
                             cb(e, listenerRes);
                         });
                     }
                     else if (_.isUndefined(emitterObj)) {
-                        LogWorker.log(meta, anno);
+                        this.log(meta, anno);
                     }
                     next(nextArgs);
                 }
@@ -159,6 +156,19 @@ class LogWorker extends Worker implements IWorker {
         });
         super.preInit(comm, whoService, cb);
         return this;
+    }
+    
+    public postInit(deps, cb): IWorker {
+        this.comm.on('newListener', (event) => {
+            if (this.getCommEvent(event).name !== 'newListener') {
+                this.ask<IServiceListener[]>('iw-service.list-listeners', (e, listeners) => {
+                    if (e === null) {
+                        this.serviceListeners = listeners;
+                    }
+                });
+            }
+        });
+        return super.postInit(deps, cb);
     }
 
     private interceptListener(evt: ICommEventData): boolean {
@@ -170,7 +180,7 @@ class LogWorker extends Worker implements IWorker {
             || evt.name === 'warn';
     }
 
-    private static log(meta: ICommEmit, anno: any, emitterObj?: any, listenerRes?: any) {
+    private log(meta: ICommEmit, anno: any, emitterObj?: any, listenerRes?: any) {
         process.nextTick(() => {
             var entry: any = {
                 meta: meta,
@@ -180,14 +190,14 @@ class LogWorker extends Worker implements IWorker {
                 entry.emitted = emitterObj;
             }
             if (!_.isUndefined(listenerRes)) {
-                entry.result = listenerRes;
+                entry.emitted = listenerRes;
             }
             var json = JsonStringifySafe(entry);
-            LogWorker.writeStdout(json);
+            this.writeStdout(json);
         });
     }
 
-    private static error(meta: ICommEmit, anno: any, error: Error, emitterObj?: any) {
+    private error(meta: ICommEmit, anno: any, error: Error, emitterObj?: any) {
         process.nextTick(() => {
             var entry: any = {
                 meta: meta,
@@ -197,16 +207,20 @@ class LogWorker extends Worker implements IWorker {
                 if (error instanceof Error) {
                     entry.error = error.message;
                     entry.stack = error.stack.substring(error.stack.indexOf('at', 7 + error.message.length));
+                    entry = _.merge(entry, _.omit(error, ['message', 'stack']));
                 }
                 if (_.isString(error)) {
                     entry.error = error;
+                }
+                if (_.isObject(error)) {
+                    entry = _.merge(entry, error);
                 }
             }
             if (!_.isUndefined(emitterObj)) {
                 entry.emitted = emitterObj;
             }
             var json = JsonStringifySafe(entry);
-            LogWorker.writeStderr(json);
+            this.writeStderr(json);
         });
     }
 }

@@ -110,7 +110,7 @@ class ConnectorWorker extends Worker implements IWorker {
             }).confirm('connect-to-external-services', (e) => {
                 if (e === null) {
                     if (!_.isEmpty(this.serviceConnections)) {
-                        this.intercept('inform.iw-service.available-listeners', {
+                        this.intercept('ask.iw-service.list-listeners', {
                             preEmit: (stop, next, anno, ...args) => {
                                 var listeners:IServiceListener[] = args.pop();
                                 _.each(this.serviceConnections, (conn) => {
