@@ -65,17 +65,6 @@ class SocketWorker extends Worker implements ISocketWorker {
             if (_.isUndefined(anno) || anno === null) {
                 anno = {};
             }
-            event.data.push(anno);
-            var cb = void 0;
-            var callCb = (<any>_).any([
-                'tell',
-                'inform'
-            ], (m) => {
-                return emit.method === m;
-            });
-            if (callCb) {
-                cb = event.data.pop();
-            }
             if (!_.isUndefined(socket.iwAuth)) {
                 _.set(anno, 'auth.authentication.authenticated', socket.iwAuth.authentication.authenticated);
                 if (!_.isUndefined(socket.iwAuth.authorization)) {
@@ -96,10 +85,26 @@ class SocketWorker extends Worker implements ISocketWorker {
                     _.set(anno, 'auth.authorization', authorizationAnno);
                 }
             }
-            this[emit.method].apply(this, [ emit ].concat(event.data));
-            if (callCb) {
-                cb();
+            var cb = void 0;
+            if (emit.method != 'tell' && emit.method != 'inform') {
+                cb = event.data.pop();
             }
+            event.data.push((...args) => {
+                if (args[0] != null) {
+                    var errorObj = <any>{
+                        message: args[0].message
+                    };
+                    if (!_.isUndefined(args[0].code)) {
+                        errorObj.code = args[0].code;
+                    }
+                    args[0] = errorObj;
+                }
+                if (_.isFunction(cb)) {
+                    cb.apply(this, args);
+                }
+            });
+            event.data.push(anno);
+            this[emit.method].apply(this, [ emit ].concat(event.data));
         });
     }
 

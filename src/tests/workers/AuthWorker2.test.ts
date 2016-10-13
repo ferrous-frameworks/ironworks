@@ -200,7 +200,6 @@ describe('AuthWorker', () => {
 import ioClient = require('socket.io-client');
 class ConnectorWorker extends Worker implements IWorker {
     private envWorker: string;
-    private clientConnectionEventsLogLevel: string;
     private socketIoClientOpts: any;
     private serviceConnections: {
         service: any;
@@ -215,7 +214,6 @@ class ConnectorWorker extends Worker implements IWorker {
         
         this.opts = this.opts.beAdoptedBy(<any>{
             environmentWorker: 'iw-env',
-            clientConnectionEventsLogLevel: 800,
             socketIoClient: {
                 multiplex: false,
                 timeout: 5000,
@@ -225,7 +223,6 @@ class ConnectorWorker extends Worker implements IWorker {
         this.opts.merge(opts);
         
         this.envWorker = this.opts.get<string>('environmentWorker');
-        this.clientConnectionEventsLogLevel = this.opts.get<string>('clientConnectionEventsLogLevel');
         this.socketIoClientOpts = this.opts.get('socketIoClient');
         
         this.serviceConnections = [];
@@ -306,31 +303,12 @@ class ConnectorWorker extends Worker implements IWorker {
                 preEmit: (stop, next, anno, ...args) => {
                     var emit = this.getCommEmit(args.shift());
                     var emitterCb = void 0;
-                    if (_.isFunction(args[args.length - 1])) {
-                        emitterCb = args[args.length - 1];
+                    if (_.isFunction(_.last(args))) {
+                        emitterCb = args.pop();
                     }
-                    async.waterfall([
-                        (cb) => {
-                            this.connectToService(serviceConn, (e, socket) => {
-                                if (e == null) {
-                                    cb(null, socket);
-                                }
-                                else {
-                                    if (!_.isUndefined(emitterCb)) {
-                                        process.nextTick(() => { emitterCb(e); });
-                                    }
-                                    cb(e);
-                                }
-                            });
-                        },
-                        (socket, cb) => {
-                            this.emitToSocket(socket, emit, anno, args, () => {
-                                cb(null);
-                            });
-                        }
-                    ], (e) => {
-                        if (e === null) {
-                            next(args);
+                    this.emitToService(serviceConn, emit, anno, args, emitterCb, (stop) => {
+                        if (!stop) {
+                            next();
                         }
                         else {
                             stop();
@@ -340,84 +318,78 @@ class ConnectorWorker extends Worker implements IWorker {
             });
         });
     }
-
-    private emitToSocket(socket, emit, anno, args, cb) {
-        var emitterCb = args.pop();
-        var hasCb = _.isFunction(emitterCb);
-        if (!hasCb) {
-            args.push(emitterCb);
-        }
-        args.push((...args) => {
-            if (!hasCb) {
-                cb();
-            }
-            else {
-                emitterCb.apply(this, args.concat(anno));
-            }
-            socket.close();
-        });
-        socket.emit.apply(socket, [emit.getText(), emit, anno].concat(args));
-    }
     
-    private connectToService(srvConn: any, cb: (e: Error, c?: any) => void, attempts?: number) {
-        if (_.isUndefined(attempts)) {
-            attempts = 0;
-        }
+    private emitToService(srvConn: any, emit: any, anno: any, args: any[], emitterCb, cb) {
         var clientOpts = _.cloneDeep(this.socketIoClientOpts);
         clientOpts.extraHeaders = _.merge(_.isEmpty(srvConn.authpack) ? void 0 : { 
             authpack: JSON.stringify(srvConn.authpack)
         }, clientOpts.extraHeaders);
-        attempts++;
-        var c: any = ioClient(srvConn.service.url, clientOpts);
-        c.on('error', (errorJson) => {
+        var socket: any = ioClient(srvConn.service.url, clientOpts);
+        socket.once('error', (errorJson) => {
             var e = JSON.parse(errorJson);
-            switch (e.code) {
-                case 401:
-                    srvConn.authpack = {};
-                    async.waterfall([
-                        (cb) => {
-                            this.authenticateWithSecureService(srvConn, (e) => {
-                                cb(e);
-                            });
-                        },
-                        () => {
-                            if (attempts > 0) {
-                                cb(new Error('unknown error authenticating with server'));
-                            }
-                            else {
-                                this.connectToService(srvConn, (e, c) => {
-                                    cb(e, c);
-                                }, attempts);
-                            }
+            
+            console.log('connector: error', e);
+            
+        });
+        socket.once('connect', () => {
+            socket.emit.apply(socket, [emit.getText(), emit, anno].concat(args).concat([ (...resArgs) => {
+                if (resArgs[0] == null) {
+                    socket.close();
+                    if (_.isFunction(emitterCb)) {
+                        emitterCb.apply(this, resArgs);
+                    }
+                    cb(false);
+                }
+                else {
+                    this.handleSocketError(resArgs[0], srvConn, socket, (e) => {
+                        if (e == null) {
+                            this.emitToService(srvConn, emit, anno, args, emitterCb, cb);
                         }
-                    ], (e) => {
-                        if (e != null) {
-                            cb(e);
+                        else {
+                            if (_.isFunction(emitterCb)) {
+                                emitterCb(e);
+                            }
+                            cb(true);
                         }
+                        
                     });
-                    break;
-                case 403:
-                    break;
-                default:
-                    cb(e);
-                    break;
-            }
+                }
+            } ]));
         });
-        c.once('connect', () => {
-            this.informSocketClientEvent('connection-connect', srvConn.service);
-            cb(null, c);
-        });
-        c.once('connect_error', (connError) => {
+        socket.once('connect_error', (connError) => {
             var e = new Error(connError.message);
             (<any>e).code = connError.description;
-            cb(e);
+            
+            console.log('connector: connect_error', e);
+            
         });
-        c.once('authpack-update', (authpack) => {
-            console.log('asdfasdfasdf', authpack);
+        socket.once('authpack-update', (authpack) => {
+            console.log('connector: authpack-update', authpack);
         });
-        c.once('disconnect', () => {
-            this.informSocketClientEvent('connection-disconnect', srvConn.service);
+        socket.once('disconnect', () => {
+            console.log('connector: disconnect');
         });
+    }
+    
+    private handleSocketError(errorObj, srvConn, socket, cb) {
+        socket.close();
+        var e: any = new Error(errorObj.message);
+        if (!_.isUndefined(errorObj.code)) {
+            (<any>e).code = errorObj.code;
+        }
+        switch (e.code) {
+            case 401:
+                this.authenticateWithSecureService(srvConn, (e) => {
+                    cb(e);
+                });
+                break;
+            case 403:
+                console.log('connector: socket cb error 403', e);
+                break;
+            default:
+                cb(e);
+                break;
+        }
     }
     
     private authenticateWithSecureService(srvConn: any, cb: (e: Error) => void) {
@@ -436,20 +408,6 @@ class ConnectorWorker extends Worker implements IWorker {
                 }
                 cb(e);
             });
-    }
-    
-    private informSocketClientEvent(eventName: string, service: any, e?: any) {
-        var msg: any = {
-            serviceName: service.name
-        };
-        if (!_.isUndefined(e)) {
-            msg.error = e;
-        }
-        this.annotate({
-            log: {
-                level: this.clientConnectionEventsLogLevel
-            }
-        }).inform(eventName, msg);
     }
 }
 
@@ -623,6 +581,8 @@ class SecureHttpServerWorker extends Worker implements IWorker {
 }
 
 class AuthWorker extends Worker implements IWorker {
+    private requireAuthenticationOnAuthorizedListeners: boolean;
+    
     constructor(opts?: any) {
         super([
             'iw-auth-packager'
@@ -636,6 +596,8 @@ class AuthWorker extends Worker implements IWorker {
             requireAuthenticationOnAuthorizedListeners: true
         }, 'worker');
         this.opts.merge(opts);
+        
+        this.requireAuthenticationOnAuthorizedListeners = this.opts.get<boolean>('requireAuthenticationOnAuthorizedListeners');
     }
     
     public init(cb): IWorker {
@@ -649,14 +611,12 @@ class AuthWorker extends Worker implements IWorker {
                 cb(e, opened);
             });
         });
-        this.annotate({ auth: { required: { authentication: { authenticated: true } } } })
-            .ack('test-authentication', (cb) => {
-                cb(null);
-            });
-        this.annotate({ auth: { required: { authorization: { test: true } } } })
-            .ack('test-authorization', (cb) => {
-                cb(null);
-            });
+        this.annotate({ auth: { required: { authentication: { authenticated: true } } } }).ack('test-authentication', (cb) => {
+            cb(null);
+        });
+        this.annotate({ auth: { required: { authorization: { test: true } } } }).ack('test-authorization', (cb) => {
+            cb(null);
+        });
         this.answer('logout', (cb) => {
             //TODO logout
         });
@@ -798,7 +758,7 @@ class AuthWorker extends Worker implements IWorker {
         auth = _.merge({
             required: {
                 authentication: {
-                    authenticated: false
+                    authenticated: this.requireAuthenticationOnAuthorizedListeners && !_.isEmpty(_.get(auth, 'required.authorization.roles'))
                 },
                 authorization: {
                     test: false,
@@ -810,9 +770,6 @@ class AuthWorker extends Worker implements IWorker {
             },
             authorization: []
         }, auth);
-        
-        console.log(auth);
-        
         if (!auth.authentication.authenticated && auth.required.authentication.authenticated) {
             this.handleAuthFailure('unauthenticated client attempted to access an authenticated endpoint', 401, emitterCb);
             cb(true);
@@ -842,28 +799,23 @@ class AuthWorker extends Worker implements IWorker {
                 });
             }
             if (!_.isEmpty(auth.required.authorization.roles)) {
-                var reqAuthenticated = this.opts.get<boolean>('requireAuthenticationOnAuthorizedListeners');
-                if (!reqAuthenticated || auth.authentication.authenticated) {
-                    async.each(auth.required.authorization.roles, (reqRole: any, cb) => {
-                        var match = (matchAllRoles ? _.every : (<any>_).any)(auth.authorization, (authorization) => {
-                            var typeMatch = reqRole.type === '*' || authorization.type === reqRole.type;
-                            var roleMatch = reqRole.name === '*' || (<any>_).any(authorization.roles, (role) => {
-                                return reqRole.name === role;
-                            });
-                            return typeMatch && roleMatch;
+                async.each(auth.required.authorization.roles, (reqRole: any, cb) => {
+                    cb(!(matchAllRoles ? _.every : (<any>_).any)(auth.authorization, (authorization) => {
+                        var typeMatch = reqRole.type === '*' || authorization.type === reqRole.type;
+                        var roleMatch = reqRole.name === '*' || (<any>_).any(authorization.roles, (role) => {
+                            return reqRole.name === role;
                         });
-                        if (!match) {
-                            cb(true);
-                        }
-                    }, (e) => {
+                        return typeMatch && roleMatch;
+                    }) ? 1 : null);
+                }, (e) => {
+                    if (e == null) {
+                        cb(false);
+                    }
+                    else {
                         this.handleAuthFailure('unauthorized client attempted to access an authorized endpoint', 403, emitterCb);
                         cb(true);
-                    });
-                }
-                else {
-                    this.handleAuthFailure('unauthenticated client attempted to access an authorized endpoint', 401, emitterCb);
-                    cb(true);
-                }
+                    }
+                });
             }
             else {
                 cb(false);
@@ -1271,16 +1223,15 @@ class UserCredsValidator extends Worker implements IWorker {
                 cb(err);
             }
         });
-        this.annotate({ internal: true })
-            .respond<any, any>('get-roles', (id, cb) => {
-                switch (id) {
-                    default:
-                        cb(null, [
-                            'mock-role'
-                        ])
-                        break;
-                }
-            });
+        this.annotate({ internal: true }).respond<any, any>('get-roles', (id, cb) => {
+            switch (id) {
+                default:
+                    cb(null, [
+                        'mock-role'
+                    ])
+                    break;
+            }
+        });
         return super.init(cb);
     }
 }
