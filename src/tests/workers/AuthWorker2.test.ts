@@ -172,6 +172,21 @@ describe('AuthWorker', () => {
                         cb(e, serverService, clientService);
                     });
             },
+            (serverService, clientService, cb) => {
+                clientService
+                    .annotate({
+                        auth: {
+                            authorization: {
+                                type: 'user',
+                                id: 'test-user',
+                                roles: [ 'mock-role' ]
+                            }
+                        }
+                    })
+                    .confirm('iws-auth-refactor-server.confirm.iw-service.must-be-service-admin-and-user-mock', (e) => {
+                        cb(e, serverService, clientService);
+                    });
+            },
             // (serverService, clientService, cb) => {
             //     clientService
             //         .annotate({
@@ -326,16 +341,27 @@ class ConnectorWorker extends Worker implements IWorker {
         }, clientOpts.extraHeaders);
         var socket: any = ioClient(srvConn.service.url, clientOpts);
         socket.once('error', (errorJson) => {
-            var e = JSON.parse(errorJson);
-            
-            console.log('connector: error', e);
-            
+            this.handleSocketError(JSON.parse(errorJson), srvConn, socket, (e) => {
+                if (e == null) {
+                    this.emitToService(srvConn, emit, anno, args, emitterCb, cb);
+                }
+                else {
+                    if (_.isFunction(emitterCb)) {
+                        emitterCb(e);
+                    }
+                    cb(true);
+                }
+                
+            });
         });
         socket.once('connect', () => {
             socket.emit.apply(socket, [emit.getText(), emit, anno].concat(args).concat([ (...resArgs) => {
                 if (resArgs[0] == null) {
                     socket.close();
                     if (_.isFunction(emitterCb)) {
+                        
+                        console.log('good call', emit.getText());
+                        
                         emitterCb.apply(this, resArgs);
                     }
                     cb(false);
@@ -359,15 +385,22 @@ class ConnectorWorker extends Worker implements IWorker {
         socket.once('connect_error', (connError) => {
             var e = new Error(connError.message);
             (<any>e).code = connError.description;
-            
-            console.log('connector: connect_error', e);
-            
+            this.handleSocketError(e, srvConn, socket, (e) => {
+                if (e == null) {
+                    this.emitToService(srvConn, emit, anno, args, emitterCb, cb);
+                }
+                else {
+                    if (_.isFunction(emitterCb)) {
+                        emitterCb(e);
+                    }
+                    cb(true);
+                }
+                
+            });
         });
-        socket.once('authpack-update', (authpack) => {
-            console.log('connector: authpack-update', authpack);
-        });
-        socket.once('disconnect', () => {
-            console.log('connector: disconnect');
+        socket.once('authpack-update', (authpack, cb) => {
+            srvConn.authpack = authpack;
+            cb();
         });
     }
     
@@ -446,6 +479,12 @@ class SecureSocketWorker extends Worker implements IWorker {
                     if (e == null) {
                         iwAuth.authentication.authenticated = true;
                         iwAuth.authorization = opened.authorization;
+                        if (!_.isUndefined(opened.accessToken)) {
+                            iwAuth.newAuthpack = {
+                                accessToken: opened.accessToken,
+                                refreshToken: opened.refreshToken
+                            };
+                        }
                         next();
                     }
                     else {
@@ -659,27 +698,22 @@ class AuthWorker extends Worker implements IWorker {
                 });
             },
             (tokens) => {
-                this.getAuthpack(tokens.refresh, (e, authpack) => {
-                    cb(e, authpack);
-                });
-            },
-            // (tokens) => {
-            //     if (!_.isUndefined(tokens.refresh)) {
-            //         if (!_.isUndefined(tokens.access)) {
-            //             cb(null, {
-            //                 authorization: tokens.access
-            //             });
-            //         }
-            //         else {
-            //             this.getAuthpack(tokens.refresh, (e, authpack) => {
-            //                 cb(e, authpack);
-            //             });
-            //         }
-            //     }
-            //     else {
-            //         cb(new Error('unexpected error occured processing tokens'));
-            //     }
-            // }
+                if (!_.isUndefined(tokens.refresh)) {
+                    if (!_.isUndefined(tokens.access)) {
+                        cb(null, {
+                            authorization: tokens.access
+                        });
+                    }
+                    else {
+                        this.getAuthpack(tokens.refresh, (e, authpack) => {
+                            cb(e, authpack);
+                        });
+                    }
+                }
+                else {
+                    cb(new Error('unexpected error occured processing tokens'));
+                }
+            }
         ], (e) => {
             cb(e);
         });
@@ -946,6 +980,12 @@ class JwtAuthPackager extends Worker implements IWorker {
                     jwt.verify(authpack.refreshToken, this.secret, (e, verified: any) => {
                         if (e === null) {
                             if (_.isUndefined(this.refreshTokenRepoWorker)) {
+                                
+                                console.log({
+                                    access: access, 
+                                    refresh: verified
+                                })
+                                
                                 cb(null, {
                                     access: access, 
                                     refresh: verified
@@ -1097,7 +1137,7 @@ class RefreshTokenRepo extends Worker implements IWorker {
     }
     
     public init(cb): IWorker {
-        this.redisKey = [ this.whoService.name, 'auth', 'refresh-tokens', '' ].join('.');
+        this.redisKey = this.whoService.name + '.auth.refresh-tokens.';
         this.annotate({ internal: true }).respond<any, any>('create', (create, cb) => {
             var id = idHelper.newId();
             this.fakeRedis[this.redisKey + id] = {
@@ -1105,12 +1145,15 @@ class RefreshTokenRepo extends Worker implements IWorker {
                 id: create.refresh.id,
                 type: create.refresh.type
             };
+            
+            // console.log('refresh repo: create', typeof create.expiresIn, create.expiresIn);
+            
             // setTimeout(() => {
                 
             //     console.log('refresh token repo key expired: ' + this.redisKey + id);
                 
             //     delete this.fakeRedis[this.redisKey + id];
-            // }, parseInt(create.expiresIn) * 1000);
+            // }, create.expiresIn * 1000);
             process.nextTick(() => {
                 cb(null, _.clone(this.fakeRedis[this.redisKey + id]));
             });
