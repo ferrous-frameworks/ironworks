@@ -63,76 +63,76 @@ describe('AuthWorker', () => {
                     })
                     .start();
             },
-            // (serverService, cb) => {
-            //     async.waterfall([
-            //         (cb) => {
-            //             request({
-            //                 url: 'http://localhost:8080/api/comm/iws-auth-refactor-server/confirm/iw-service/all-must-be-admin',
-            //                 method: 'POST',
-            //                 json: true,
-            //                 body: {}
-            //             }, (e, res: any) => {
-            //                 expect(e).to.be.null;
-            //                 expect(res.body).to.be.equal('unable to authenticate');
-            //                 expect(res.statusCode).to.be.equal(401);
-            //                 cb(e);
-            //             });
-            //         },
-            //         (cb) => {
-            //             var jar = request.jar();
-            //             request({
-            //                 url: 'http://localhost:8080/api/comm/iws-auth-refactor-server/request/iw-auth/authenticate',
-            //                 method: 'POST',
-            //                 jar: jar,
-            //                 json: true,
-            //                 body: {
-            //                     id: 'test-user',
-            //                     password: 'password'
-            //                 }
-            //             }, (e, res: any) => {
-            //                 if (e === null) {
-            //                     expect(res.statusCode).to.be.equal(200);
-            //                     expect(res.body).to.not.have.property('authorization');
-            //                     expect(res.body).to.not.have.property('access_token');
-            //                     expect(res.body).to.not.have.property('refresh_token');
-            //                     expect((<any>jar)._jar.store.idx.localhost['/'].access_token.value).to.be.a('string');
-            //                     expect((<any>jar)._jar.store.idx.localhost['/'].refresh_token.value).to.be.a('string');
-            //                     expect(res.headers['iw-authorization']).to.be.an('string');
-            //                 }
-            //                 cb(e, jar);
-            //             });
-            //         },
-            //         (jar, cb) => {
-            //             request({
-            //                 url: 'http://localhost:8080/api/comm/iws-auth-refactor-server/confirm/iw-auth/test-authorization',
-            //                 method: 'POST',
-            //                 jar: jar,
-            //                 json: true,
-            //                 body: {}
-            //             }, (e, res: any) => {
-            //                 expect(e).to.be.null;
-            //                 expect(res.statusCode).to.be.equal(200);
-            //                 cb(e, jar);
-            //             });
-            //         },
-            //         (jar, cb) => {
-            //             request({
-            //                 url: 'http://localhost:8080/api/comm/iws-auth-refactor-server/confirm/iw-service/all-must-be-admin',
-            //                 method: 'POST',
-            //                 jar: jar,
-            //                 json: true,
-            //                 body: {}
-            //             }, (e, res: any) => {
-            //                 expect(e).to.be.null;
-            //                 expect(res.body).to.be.equal('unable to authorize');
-            //                 expect(res.statusCode).to.be.equal(403);
-            //                 cb(e, jar);
-            //             });
-            //         }
-            //     ], (e) => {
-            //         cb(e, serverService);
-            //     });
-            // },
+            (serverService, cb) => {
+                async.waterfall([
+                    (cb) => {
+                        request({
+                            url: 'http://localhost:8080/api/comm/iws-auth-refactor-server/confirm/iw-service/all-must-be-admin',
+                            method: 'POST',
+                            json: true,
+                            body: {}
+                        }, (e, res: any) => {
+                            expect(e).to.be.null;
+                            expect(res.body).to.be.equal('unable to authenticate');
+                            expect(res.statusCode).to.be.equal(401);
+                            cb(e);
+                        });
+                    },
+                    (cb) => {
+                        var jar = request.jar();
+                        request({
+                            url: 'http://localhost:8080/api/comm/iws-auth-refactor-server/request/iw-auth/authenticate',
+                            method: 'POST',
+                            jar: jar,
+                            json: true,
+                            body: {
+                                id: 'test-user',
+                                password: 'password'
+                            }
+                        }, (e, res: any) => {
+                            if (e === null) {
+                                expect(res.statusCode).to.be.equal(200);
+                                expect(res.body).to.not.have.property('authorization');
+                                expect(res.body).to.not.have.property('access_token');
+                                expect(res.body).to.not.have.property('refresh_token');
+                                expect((<any>jar)._jar.store.idx.localhost['/'].access_token.value).to.be.a('string');
+                                expect((<any>jar)._jar.store.idx.localhost['/'].refresh_token.value).to.be.a('string');
+                                expect(res.headers['iw-authorization']).to.be.an('string');
+                            }
+                            cb(e, jar);
+                        });
+                    },
+                    (jar, cb) => {
+                        request({
+                            url: 'http://localhost:8080/api/comm/iws-auth-refactor-server/confirm/iw-auth/test-authorization',
+                            method: 'POST',
+                            jar: jar,
+                            json: true,
+                            body: {}
+                        }, (e, res: any) => {
+                            expect(e).to.be.null;
+                            expect(res.statusCode).to.be.equal(200);
+                            cb(e, jar);
+                        });
+                    },
+                    (jar, cb) => {
+                        request({
+                            url: 'http://localhost:8080/api/comm/iws-auth-refactor-server/confirm/iw-service/all-must-be-admin',
+                            method: 'POST',
+                            jar: jar,
+                            json: true,
+                            body: {}
+                        }, (e, res: any) => {
+                            expect(e).to.be.null;
+                            expect(res.body).to.be.equal('unable to authorize');
+                            expect(res.statusCode).to.be.equal(403);
+                            cb(e, jar);
+                        });
+                    }
+                ], (e) => {
+                    cb(e, serverService);
+                });
+            },
             (serverService, cb) => {
                 new Service('iws-auth-refactor-client')
                     .use(new EnvironmentWorker('', {
@@ -157,36 +157,36 @@ describe('AuthWorker', () => {
                     cb(e, serverService, clientService);
                 });
             },
-            // (serverService, clientService, cb) => {
-            //     clientService
-            //         .annotate({
-            //             auth: {
-            //                 authorization: {
-            //                     type: 'user',
-            //                     id: 'test-user',
-            //                     roles: [ 'mock-role' ]
-            //                 }
-            //             }
-            //         })
-            //         .confirm('iws-auth-refactor-server.confirm.iw-service.must-be-service-admin-and-user-mock', (e) => {
-            //             cb(e, serverService, clientService);
-            //         });
-            // },
-            // (serverService, clientService, cb) => {
-            //     clientService
-            //         .annotate({
-            //             auth: {
-            //                 authorization: {
-            //                     type: 'user',
-            //                     id: 'test-user',
-            //                     roles: [ 'admin' ]
-            //                 }
-            //             }
-            //         })
-            //         .confirm('iws-auth-refactor-server.confirm.iw-service.all-must-be-admin', (e) => {
-            //             cb(e, serverService, clientService);
-            //         });
-            // }
+            (serverService, clientService, cb) => {
+                clientService
+                    .annotate({
+                        auth: {
+                            authorization: {
+                                type: 'user',
+                                id: 'test-user',
+                                roles: [ 'mock-role' ]
+                            }
+                        }
+                    })
+                    .confirm('iws-auth-refactor-server.confirm.iw-service.must-be-service-admin-and-user-mock', (e) => {
+                        cb(e, serverService, clientService);
+                    });
+            },
+            (serverService, clientService, cb) => {
+                clientService
+                    .annotate({
+                        auth: {
+                            authorization: {
+                                type: 'user',
+                                id: 'test-user',
+                                roles: [ 'admin' ]
+                            }
+                        }
+                    })
+                    .confirm('iws-auth-refactor-server.confirm.iw-service.all-must-be-admin', (e) => {
+                        cb(e, serverService, clientService);
+                    });
+            }
         ], (e) => { 
             if (e !== null) {
                 console.log(e);
@@ -400,7 +400,14 @@ class ConnectorWorker extends Worker implements IWorker {
                 });
                 break;
             case 403:
-                console.log('connector: socket cb error 403', e);
+                if (_.isUndefined(_.get(srvConn, 'authpack.accessToken'))) {
+                    this.authenticateWithSecureService(srvConn, (e) => {
+                        cb(e);
+                    }); 
+                }
+                else {
+                    console.log('connector: handleSocketError REAL 403 error', e, srvConn);
+                }
                 break;
             default:
                 cb(e);
