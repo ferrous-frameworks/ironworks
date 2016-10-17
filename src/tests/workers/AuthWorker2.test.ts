@@ -173,6 +173,12 @@ describe('AuthWorker', () => {
                     });
             },
             (serverService, clientService, cb) => {
+                setTimeout(() => {
+                    console.log('artificial delay');
+                    cb(null, serverService, clientService);
+                }, 3000);
+            },
+            (serverService, clientService, cb) => {
                 clientService
                     .annotate({
                         auth: {
@@ -341,7 +347,10 @@ class ConnectorWorker extends Worker implements IWorker {
         }, clientOpts.extraHeaders);
         var socket: any = ioClient(srvConn.service.url, clientOpts);
         socket.once('error', (errorJson) => {
-            this.handleSocketError(JSON.parse(errorJson), srvConn, socket, (e) => {
+            var errorObj = JSON.parse(errorJson);
+            var e = new Error(errorObj.message);
+            (<any>e).code = errorObj.code;
+            this.handleSocketError(e, srvConn, socket, (e) => {
                 if (e == null) {
                     this.emitToService(srvConn, emit, anno, args, emitterCb, cb);
                 }
@@ -351,7 +360,6 @@ class ConnectorWorker extends Worker implements IWorker {
                     }
                     cb(true);
                 }
-                
             });
         });
         socket.once('connect', () => {
@@ -359,9 +367,6 @@ class ConnectorWorker extends Worker implements IWorker {
                 if (resArgs[0] == null) {
                     socket.close();
                     if (_.isFunction(emitterCb)) {
-                        
-                        console.log('good call', emit.getText());
-                        
                         emitterCb.apply(this, resArgs);
                     }
                     cb(false);
@@ -395,7 +400,6 @@ class ConnectorWorker extends Worker implements IWorker {
                     }
                     cb(true);
                 }
-                
             });
         });
         socket.once('authpack-update', (authpack, cb) => {
@@ -426,6 +430,7 @@ class ConnectorWorker extends Worker implements IWorker {
     }
     
     private authenticateWithSecureService(srvConn: any, cb: (e: Error) => void) {
+        srvConn.authpack = {};
         this.annotate({ log: { properties: [
             { name: 'password', secure: true },
             { name: 'accessToken', secure: true },
@@ -488,23 +493,21 @@ class SecureSocketWorker extends Worker implements IWorker {
                         next();
                     }
                     else {
-                        var errorToClient: any = {};
-                        var message;
-                        var code;
+                        var errorObj: any = {
+                            code: (<any>e).code
+                        };
                         if (!_.isUndefined((<any>e).code)) {
-                            errorToClient.message = 'unable to authenticate';
-                            errorToClient.code = (<any>e).code;
+                            errorObj.message = 'unable to authenticate';
                         }
                         else {
                             this.inform('error', e);
-                            errorToClient.message = 'internal server error';
+                            errorObj.message = 'internal server error';
                         }
-                        next(new Error(JSON.stringify(errorToClient)));
+                        next(new Error(JSON.stringify(errorObj)));
                     }
                 });
             }
             else {
-                iwAuth.authentication.authenticated = false;
                 next();
             }
         });
@@ -689,11 +692,6 @@ class AuthWorker extends Worker implements IWorker {
         async.waterfall([
             (cb) => {
                 this.request<any, any>('iw-auth-packager.unpackage', authpack, (e, tokens) => {
-                    if (e != null && !_.isUndefined((<any>e).code)) {
-                        this.inform('authentication-failure', {
-                            reason: e.message
-                        });
-                    }
                     cb(e, tokens);
                 });
             },
@@ -909,8 +907,8 @@ class JwtAuthPackager extends Worker implements IWorker {
     private secret: string;
     private envWorker: string;
     private refreshTokenRepoWorker: string;
-    private accessTokenExpiration: string;
-    private refreshTokenExpiration: string;
+    private accessTokenExpiration: number;
+    private refreshTokenExpiration: number;
     private issuer: string;
     
     constructor(opts?: any) {
@@ -923,14 +921,18 @@ class JwtAuthPackager extends Worker implements IWorker {
             environmentWorker: 'iw-env',
             refreshTokenRepoWorker: 'iw-refresh-token-repo',
             accessTokenExpiration: 60,
+            
+            
             refreshTokenExpiration: 30 * 24 * 60 * 60
+            
+            
         }, 'worker');
         this.opts.merge(opts);
         
         this.envWorker = this.opts.get<string>('environmentWorker');
         this.refreshTokenRepoWorker = this.opts.get<string>('refreshTokenRepoWorker');
-        this.accessTokenExpiration = this.opts.get<string>('accessTokenExpiration');
-        this.refreshTokenExpiration = this.opts.get<string>('refreshTokenExpiration');
+        this.accessTokenExpiration = this.opts.get<number>('accessTokenExpiration');
+        this.refreshTokenExpiration = this.opts.get<number>('refreshTokenExpiration');
     }
     
     public init(cb): IWorker {
@@ -946,7 +948,7 @@ class JwtAuthPackager extends Worker implements IWorker {
                             authorization: authorization
                         }, this.secret, {
                             issuer: this.issuer,
-                            expiresIn: this.accessTokenExpiration
+                            expiresIn: this.accessTokenExpiration.toString()
                         }),
                         refreshToken: refreshToken
                     });
@@ -980,12 +982,6 @@ class JwtAuthPackager extends Worker implements IWorker {
                     jwt.verify(authpack.refreshToken, this.secret, (e, verified: any) => {
                         if (e === null) {
                             if (_.isUndefined(this.refreshTokenRepoWorker)) {
-                                
-                                console.log({
-                                    access: access, 
-                                    refresh: verified
-                                })
-                                
                                 cb(null, {
                                     access: access, 
                                     refresh: verified
@@ -1009,7 +1005,7 @@ class JwtAuthPackager extends Worker implements IWorker {
                             }
                         }
                         else if (e instanceof (<any>jwt).TokenExpiredError) {
-                            var err = new Error('refresh token Expired');
+                            var err = new Error('refresh token expired');
                             (<any>err).code = 401;
                             cb(err);
                         }
@@ -1114,7 +1110,7 @@ class JwtAuthPackager extends Worker implements IWorker {
         process.nextTick(() => {
             cb(null, jwt.sign(refresh, this.secret, {
                 issuer: this.issuer,
-                expiresIn: this.refreshTokenExpiration
+                expiresIn: this.refreshTokenExpiration.toString()
             }));
         });
     }
@@ -1140,23 +1136,13 @@ class RefreshTokenRepo extends Worker implements IWorker {
         this.redisKey = this.whoService.name + '.auth.refresh-tokens.';
         this.annotate({ internal: true }).respond<any, any>('create', (create, cb) => {
             var id = idHelper.newId();
-            this.fakeRedis[this.redisKey + id] = {
+            var key = this.redisKey + id;
+            this.fakeRedis[key] = {
                 refreshId: id,
                 id: create.refresh.id,
                 type: create.refresh.type
             };
-            
-            // console.log('refresh repo: create', typeof create.expiresIn, create.expiresIn);
-            
-            // setTimeout(() => {
-                
-            //     console.log('refresh token repo key expired: ' + this.redisKey + id);
-                
-            //     delete this.fakeRedis[this.redisKey + id];
-            // }, create.expiresIn * 1000);
-            process.nextTick(() => {
-                cb(null, _.clone(this.fakeRedis[this.redisKey + id]));
-            });
+            cb(null, _.clone(this.fakeRedis[key]));
         });
         this.annotate({ internal: true }).verify<any>('validate', (refresh, cb) => {
             this.validate(refresh.refreshId, (e) => {
@@ -1171,7 +1157,6 @@ class RefreshTokenRepo extends Worker implements IWorker {
                 cb(e);
             });
         });
-        
         return super.init(cb);
     }
         
@@ -1182,6 +1167,9 @@ class RefreshTokenRepo extends Worker implements IWorker {
                 e = new Error('refresh token cannot be used');
                 (<any>e).code = 401;
             }
+            
+            console.log('refresh repo: validate', e, this.fakeRedis);
+            
             cb(e);
         });
     }
