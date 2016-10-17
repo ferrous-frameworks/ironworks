@@ -126,7 +126,7 @@ describe('AuthWorker', () => {
             //                 expect(e).to.be.null;
             //                 expect(res.body).to.be.equal('unable to authorize');
             //                 expect(res.statusCode).to.be.equal(403);
-            //                 cb(e);
+            //                 cb(e, jar);
             //             });
             //         }
             //     ], (e) => {
@@ -152,47 +152,26 @@ describe('AuthWorker', () => {
                     })
                     .start();
             },
+            (serverService, clientService, cb) => {
+                clientService.confirm('iws-auth-refactor-server.confirm.iw-auth.test-authorization', (e) => {
+                    cb(e, serverService, clientService);
+                });
+            },
             // (serverService, clientService, cb) => {
-            //     clientService.confirm('iws-auth-refactor-server.confirm.iw-auth.test-authorization', (e) => {
-            //         cb(e, serverService, clientService);
-            //     });
+            //     clientService
+            //         .annotate({
+            //             auth: {
+            //                 authorization: {
+            //                     type: 'user',
+            //                     id: 'test-user',
+            //                     roles: [ 'mock-role' ]
+            //                 }
+            //             }
+            //         })
+            //         .confirm('iws-auth-refactor-server.confirm.iw-service.must-be-service-admin-and-user-mock', (e) => {
+            //             cb(e, serverService, clientService);
+            //         });
             // },
-            (serverService, clientService, cb) => {
-                clientService
-                    .annotate({
-                        auth: {
-                            authorization: {
-                                type: 'user',
-                                id: 'test-user',
-                                roles: [ 'mock-role' ]
-                            }
-                        }
-                    })
-                    .confirm('iws-auth-refactor-server.confirm.iw-service.must-be-service-admin-and-user-mock', (e) => {
-                        cb(e, serverService, clientService);
-                    });
-            },
-            (serverService, clientService, cb) => {
-                setTimeout(() => {
-                    console.log('artificial delay');
-                    cb(null, serverService, clientService);
-                }, 3000);
-            },
-            (serverService, clientService, cb) => {
-                clientService
-                    .annotate({
-                        auth: {
-                            authorization: {
-                                type: 'user',
-                                id: 'test-user',
-                                roles: [ 'mock-role' ]
-                            }
-                        }
-                    })
-                    .confirm('iws-auth-refactor-server.confirm.iw-service.must-be-service-admin-and-user-mock', (e) => {
-                        cb(e, serverService, clientService);
-                    });
-            },
             // (serverService, clientService, cb) => {
             //     clientService
             //         .annotate({
@@ -205,7 +184,7 @@ describe('AuthWorker', () => {
             //             }
             //         })
             //         .confirm('iws-auth-refactor-server.confirm.iw-service.all-must-be-admin', (e) => {
-            //             cb(e, serverService);
+            //             cb(e, serverService, clientService);
             //         });
             // }
         ], (e) => { 
@@ -562,6 +541,12 @@ class SecureHttpServerWorker extends Worker implements IWorker {
                             if (e == null) {
                                 iwAuth.authentication.authenticated = true;
                                 iwAuth.authorization = opened.authorization;
+                                if (!_.isUndefined(opened.accessToken)) {
+                                    (<any>reply).state('access_token', opened.accessToken);
+                                }
+                                if (!_.isUndefined(opened.refreshToken)) {
+                                    (<any>reply).state('refresh_token', opened.refreshToken);
+                                }
                                 reply.continue({
                                     isAuthenticated: true,
                                     credentials: iwAuth
@@ -790,7 +775,11 @@ class AuthWorker extends Worker implements IWorker {
         auth = _.merge({
             required: {
                 authentication: {
-                    authenticated: this.requireAuthenticationOnAuthorizedListeners && !_.isEmpty(_.get(auth, 'required.authorization.roles'))
+                    authenticated: 
+                        this.requireAuthenticationOnAuthorizedListeners 
+                        &&  (   _.isString(_.get(auth, 'required.authorization'))
+                            ||  !_.isEmpty(_.get(auth, 'required.authorization.roles'))
+                            )
                 },
                 authorization: {
                     test: false,
@@ -921,11 +910,7 @@ class JwtAuthPackager extends Worker implements IWorker {
             environmentWorker: 'iw-env',
             refreshTokenRepoWorker: 'iw-refresh-token-repo',
             accessTokenExpiration: 60,
-            
-            
             refreshTokenExpiration: 30 * 24 * 60 * 60
-            
-            
         }, 'worker');
         this.opts.merge(opts);
         
@@ -1167,9 +1152,6 @@ class RefreshTokenRepo extends Worker implements IWorker {
                 e = new Error('refresh token cannot be used');
                 (<any>e).code = 401;
             }
-            
-            console.log('refresh repo: validate', e, this.fakeRedis);
-            
             cb(e);
         });
     }
