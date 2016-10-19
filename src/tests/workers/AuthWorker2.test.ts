@@ -7,6 +7,9 @@ import async = require('async');
 import jwt = require('jsonwebtoken');
 import request = require('request');
 
+import ironTree = require('iron-tree');
+import IronTree = ironTree.Tree;
+
 import idHelper = require('../../helpers/idHelper');
 
 import Service = require('../../service/Service');
@@ -47,7 +50,6 @@ describe('AuthWorker', () => {
                     .use(new UserCredsValidator())
                     .use(new ServiceCredsValidator())
                     .use(new RefreshTokenRepo())
-                    .use(new MockRoleProvider())
                     .info<IServiceReady>('ready', (iw) => {
                         iw.service.annotate({ auth: { required: { authorization: { roles: [{ type: 'service', name: 'admin' }, { type: 'user', name: 'mock-role' }] } } } })
                             .ack('must-be-service-admin-and-user-mock', (cb) => {
@@ -55,6 +57,14 @@ describe('AuthWorker', () => {
                             });
                         iw.service.annotate({ auth: { required: { authorization: 'admin' } } })
                             .ack('all-must-be-admin', (cb) => {
+                                cb(null);
+                            });
+                        iw.service.annotate({ auth: { required: { authorization: 'mock-role' } } })
+                            .ack('all-must-be-mock', (cb) => {
+                                cb(null);
+                            });
+                        iw.service.annotate({ auth: { required: { authorization: { roles: [{ type: 'user', name: 'child-role' }] } } } })
+                            .ack('must-be-user-child', (cb) => {
                                 cb(null);
                             });
                         setTimeout(() => {
@@ -66,20 +76,21 @@ describe('AuthWorker', () => {
             (serverService, cb) => {
                 async.waterfall([
                     (cb) => {
+                        var jar = request.jar();
                         request({
                             url: 'http://localhost:8080/api/comm/iws-auth-refactor-server/confirm/iw-service/all-must-be-admin',
                             method: 'POST',
+                            jar: jar,
                             json: true,
                             body: {}
                         }, (e, res: any) => {
                             expect(e).to.be.null;
                             expect(res.body).to.be.equal('unable to authenticate');
                             expect(res.statusCode).to.be.equal(401);
-                            cb(e);
+                            cb(e, jar);
                         });
                     },
-                    (cb) => {
-                        var jar = request.jar();
+                    (jar, cb) => {
                         request({
                             url: 'http://localhost:8080/api/comm/iws-auth-refactor-server/request/iw-auth/authenticate',
                             method: 'POST',
@@ -117,7 +128,140 @@ describe('AuthWorker', () => {
                     },
                     (jar, cb) => {
                         request({
+                            url: 'http://localhost:8080/api/comm/iws-auth-refactor-server/confirm/iw-service/must-be-user-child',
+                            method: 'POST',
+                            jar: jar,
+                            json: true,
+                            body: {}
+                        }, (e, res: any) => {
+                            expect(e).to.be.null;
+                            expect(res.statusCode).to.be.equal(200);
+                            cb(e, jar);
+                        });
+                    },
+                    (jar, cb) => {
+                        request({
                             url: 'http://localhost:8080/api/comm/iws-auth-refactor-server/confirm/iw-service/all-must-be-admin',
+                            method: 'POST',
+                            jar: jar,
+                            json: true,
+                            body: {}
+                        }, (e, res: any) => {
+                            expect(e).to.be.null;
+                            expect(res.body).to.be.equal('unable to authorize');
+                            expect(res.statusCode).to.be.equal(403);
+                            cb(e, jar);
+                        });
+                    },
+                    (jar, cb) => {
+                        request({
+                            url: 'http://localhost:8080/api/comm/iws-auth-refactor-server/confirm/iw-auth/logout',
+                            method: 'POST',
+                            jar: jar,
+                            json: true,
+                            body: {}
+                        }, (e, res: any) => {
+                            expect((<any>jar)._jar.store.idx.localhost['/'].access_token.value).to.equal('');
+                            expect((<any>jar)._jar.store.idx.localhost['/'].refresh_token.value).to.equal('');
+                            expect(res.headers['iw-authorization']).to.equal(void 0);
+                            cb(e, jar);
+                        });
+                    },
+                    (jar, cb) => {
+                        request({
+                            url: 'http://localhost:8080/api/comm/iws-auth-refactor-server/confirm/iw-service/all-must-be-admin',
+                            method: 'POST',
+                            jar: jar,
+                            json: true,
+                            body: {}
+                        }, (e, res: any) => {
+                            expect(e).to.be.null;
+                            expect(res.body).to.be.equal('unable to authenticate');
+                            expect(res.statusCode).to.be.equal(401);
+                            cb(e, jar);
+                        });
+                    }
+                ], (e) => {
+                    cb(e, serverService);
+                });
+            },
+            (serverService, cb) => {
+                new Service('iws-auth-refactor-client')
+                    .use(new EnvironmentWorker('', {
+                        environmentObject: {
+                            IW_JWT_AUTH_SECRET: 'secret'
+                        },
+                        serviceConnections: [{
+                            name: 'iws-auth-refactor-server',
+                            protocol: 'http',
+                            host: process.env.IP,
+                            port: '8080',
+                            id: 'my-client-service',
+                            password: 'password'
+                        }]
+                    }))
+                    // .use(new LogWorker({ level: 500 }))
+                    .use(new HttpServerWorker({
+                        host: process.env.IP,
+                        port: 8081, //process.env.PORT,
+                        apiRoute: 'api'
+                    }))
+                    .use(new SecureHttpServerWorker())
+                    .use(new AuthWorker())
+                    .use(new JwtAuthPackager())
+                    .use(new UserCredsValidator())
+                    .use(new RefreshTokenRepo())
+                    .use(new ConnectorWorker())
+                    //.use(new LogWorker({ level: 500 }))
+                    .info<IServiceReady>('ready', (iw) => {
+                        cb(null, serverService, iw.service);
+                    })
+                    .start();
+            },
+            (serverService, clientService, cb) => {
+                async.waterfall([
+                    (cb) => {
+                        var jar = request.jar();
+                        request({
+                            url: 'http://localhost:8081/api/comm/iws-auth-refactor-client/request/iw-auth/authenticate',
+                            method: 'POST',
+                            jar: jar,
+                            json: true,
+                            body: {
+                                id: 'test-user',
+                                password: 'password'
+                            }
+                        }, (e, res: any) => {
+                            if (e === null) {
+                                expect(res.statusCode).to.be.equal(200);
+                                expect(res.body).to.not.have.property('authorization');
+                                expect(res.body).to.not.have.property('access_token');
+                                expect(res.body).to.not.have.property('refresh_token');
+                                expect((<any>jar)._jar.store.idx.localhost['/'].access_token.value).to.be.a('string');
+                                expect((<any>jar)._jar.store.idx.localhost['/'].refresh_token.value).to.be.a('string');
+                                expect(res.headers['iw-authorization']).to.be.an('string');
+                            }
+                            cb(e, jar);
+                        });
+                    },
+                    (jar, cb) => {
+                        request({
+                            url: 'http://localhost:8081/api/comm/iws-auth-refactor-server/confirm/iw-service/all-must-be-mock',
+                            method: 'POST',
+                            jar: jar,
+                            json: true,
+                            body: {}
+                        }, (e, res: any) => {
+                            expect(e).to.be.null;
+                            expect(res.body).to.have.property('error');
+                            expect(res.body.error).to.be.equal('Internal Server Error');
+                            expect(res.statusCode).to.be.equal(500);
+                            cb(e, jar);
+                        });
+                    },
+                    (jar, cb) => {
+                        request({
+                            url: 'http://localhost:8081/api/comm/iws-auth-refactor-server/confirm/iw-service/all-must-be-admin',
                             method: 'POST',
                             jar: jar,
                             json: true,
@@ -130,27 +274,8 @@ describe('AuthWorker', () => {
                         });
                     }
                 ], (e) => {
-                    cb(e, serverService);
+                    cb(e, serverService, clientService);
                 });
-            },
-            (serverService, cb) => {
-                new Service('iws-auth-refactor-client')
-                    .use(new EnvironmentWorker('', {
-                        serviceConnections: [{
-                            name: 'iws-auth-refactor-server',
-                            protocol: 'http',
-                            host: process.env.IP,
-                            port: '8080',
-                            id: 'my-client-service',
-                            password: 'password'
-                        }]
-                    }))
-                    .use(new ConnectorWorker())
-                    //.use(new LogWorker({ level: 500 }))
-                    .info<IServiceReady>('ready', (iw) => {
-                        cb(null, serverService, iw.service);
-                    })
-                    .start();
             },
             (serverService, clientService, cb) => {
                 clientService.confirm('iws-auth-refactor-server.confirm.iw-auth.test-authorization', (e) => {
@@ -200,6 +325,7 @@ describe('AuthWorker', () => {
 import ioClient = require('socket.io-client');
 class ConnectorWorker extends Worker implements IWorker {
     private envWorker: string;
+    private credsValidator: string;
     private socketIoClientOpts: any;
     private serviceConnections: {
         service: any;
@@ -214,6 +340,7 @@ class ConnectorWorker extends Worker implements IWorker {
         
         this.opts = this.opts.beAdoptedBy(<any>{
             environmentWorker: 'iw-env',
+            credsValidator: 'service',
             socketIoClient: {
                 multiplex: false,
                 timeout: 5000,
@@ -223,9 +350,17 @@ class ConnectorWorker extends Worker implements IWorker {
         this.opts.merge(opts);
         
         this.envWorker = this.opts.get<string>('environmentWorker');
+        this.credsValidator = this.opts.get<string>('credsValidator');
         this.socketIoClientOpts = this.opts.get('socketIoClient');
         
         this.serviceConnections = [];
+    }
+    
+    public init(cb): IWorker {
+        this.annotate({ internal: true }).answer('list-external-service-names', (cb) => {
+            cb(null, (<any>_).pluck(this.serviceConnections, 'name'));
+        });
+        return super.init(cb);
     }
     
     public postInit(deps, cb): IWorker {
@@ -306,8 +441,8 @@ class ConnectorWorker extends Worker implements IWorker {
                     if (_.isFunction(_.last(args))) {
                         emitterCb = args.pop();
                     }
-                    this.emitToService(serviceConn, emit, anno, args, emitterCb, (stop) => {
-                        if (!stop) {
+                    this.emitToService(serviceConn, emit, anno, args, emitterCb, (shouldStop) => {
+                        if (!shouldStop) {
                             next();
                         }
                         else {
@@ -393,6 +528,9 @@ class ConnectorWorker extends Worker implements IWorker {
         if (!_.isUndefined(errorObj.code)) {
             (<any>e).code = errorObj.code;
         }
+        if (!_.isUndefined(errorObj.unauthorizedClients)) {
+            (<any>e).unauthorizedClients = errorObj.unauthorizedClients;
+        }
         switch (e.code) {
             case 401:
                 this.authenticateWithSecureService(srvConn, (e) => {
@@ -406,7 +544,14 @@ class ConnectorWorker extends Worker implements IWorker {
                     }); 
                 }
                 else {
-                    console.log('connector: handleSocketError REAL 403 error', e, srvConn);
+                    if ((<any>_).any((<any>e).unauthorizedClients, (uc) => {
+                        return uc.id == srvConn.service.id && uc.type == this.credsValidator;
+                    })) {
+                        cb(new Error('internal server error'));
+                    }
+                    else {
+                        cb(e);
+                    }
                 }
                 break;
             default:
@@ -423,7 +568,7 @@ class ConnectorWorker extends Worker implements IWorker {
             { name: 'refreshToken', secure: true },
         ] } })
             .request(this.getCommEvent(srvConn.service.name + '.request.iw-auth.authenticate').getText(), {
-                type: 'service',
+                type: this.credsValidator,
                 id: srvConn.service.id,
                 password: srvConn.service.password
             }, (e, authpack) => {
@@ -607,6 +752,15 @@ class SecureHttpServerWorker extends Worker implements IWorker {
                     (<any>reply).state('refresh_token', req.response.source.refreshToken);
                     delete req.response.source.refreshToken;
                 }
+                var worker = _.get(req, 'params.worker');
+                var name = _.get(req, 'params.name');
+                if (worker == 'iw-auth' && name == 'logout') {
+                    (<any>reply).unstate('access_token');
+                    (<any>reply).unstate('refresh_token');
+                    if (!_.isUndefined(req.response.headers)) {
+                        delete req.response.headers['iw-authorization'];
+                    }
+                }
                 reply.continue();
             }
         });
@@ -615,6 +769,7 @@ class SecureHttpServerWorker extends Worker implements IWorker {
 }
 
 class AuthWorker extends Worker implements IWorker {
+    private roleTree: IronTree<any>;
     private requireAuthenticationOnAuthorizedListeners: boolean;
     
     constructor(opts?: any) {
@@ -631,6 +786,7 @@ class AuthWorker extends Worker implements IWorker {
         }, 'worker');
         this.opts.merge(opts);
         
+        this.roleTree = new IronTree<any>();
         this.requireAuthenticationOnAuthorizedListeners = this.opts.get<boolean>('requireAuthenticationOnAuthorizedListeners');
     }
     
@@ -651,12 +807,15 @@ class AuthWorker extends Worker implements IWorker {
         this.annotate({ auth: { required: { authorization: { test: true } } } }).ack('test-authorization', (cb) => {
             cb(null);
         });
-        this.answer('logout', (cb) => {
-            //TODO logout
+        this.ack('logout', (cb) => {
+            cb(null);
         });
         this.intercept(this.getCommEvent('*.*.*'), {
             preEmit: (stop, next, anno, ...args) => {
                 if (!_.isUndefined(anno.auth)) {
+                    if (_.get(anno.auth, 'required.authorization.test') && (args[0].name != 'test-authorization' || args[0].worker != this.me.name)) {
+                        anno.auth.required.authorization.test = false;
+                    }
                     this.checkAuth(anno.auth, _.last(args), (callStop) => {
                         if (!callStop) {
                             next();
@@ -664,7 +823,7 @@ class AuthWorker extends Worker implements IWorker {
                         else {
                             stop();
                         }
-                    });   
+                    }, args[0]);   
                 }
                 else {
                     next();
@@ -778,7 +937,10 @@ class AuthWorker extends Worker implements IWorker {
         }); 
     }
     
-    private checkAuth(auth, emitterCb: Function, cb: (stop: boolean) => void) {
+    private checkAuth(auth, emitterCb: Function, cb: (stop: boolean) => void, emit: any) {
+        if (!_.isUndefined(auth.authorization) && !_.isArray(auth.authorization)) {
+            auth.authorization = [ auth.authorization ];
+        }
         auth = _.merge({
             required: {
                 authentication: {
@@ -799,13 +961,11 @@ class AuthWorker extends Worker implements IWorker {
             authorization: []
         }, auth);
         if (!auth.authentication.authenticated && auth.required.authentication.authenticated) {
-            this.handleAuthFailure('unauthenticated client attempted to access an authenticated endpoint', 401, emitterCb);
+            this.handleAuthFailure('unauthenticated client attempted to access an authenticated endpoint', 401, void 0, emitterCb);
             cb(true);
         }
         else {
-            var matchAllRoles = false;
             if (_.isString(auth.required.authorization)) {
-                matchAllRoles = true;
                 auth.required.authorization = {
                     test: false,
                     roles: [{
@@ -821,29 +981,37 @@ class AuthWorker extends Worker implements IWorker {
                 }
             }
             if (auth.required.authorization.test) {
-                auth.required.authorization.roles.push({
+                auth.required.authorization.roles = [{
                     type: '*',
                     name: '*'
-                });
+                }];
             }
             if (!_.isEmpty(auth.required.authorization.roles)) {
-                async.each(auth.required.authorization.roles, (reqRole: any, cb) => {
-                    cb(!(matchAllRoles ? _.every : (<any>_).any)(auth.authorization, (authorization) => {
-                        var typeMatch = reqRole.type === '*' || authorization.type === reqRole.type;
-                        var roleMatch = reqRole.name === '*' || (<any>_).any(authorization.roles, (role) => {
-                            return reqRole.name === role;
-                        });
-                        return typeMatch && roleMatch;
-                    }) ? 1 : null);
-                }, (e) => {
-                    if (e == null) {
-                        cb(false);
-                    }
-                    else {
-                        this.handleAuthFailure('unauthorized client attempted to access an authorized endpoint', 403, emitterCb);
-                        cb(true);
-                    }
+                var unauthorizedClients: any[] = _.map(auth.authorization, (authorization: any) => {
+                    return {
+                        type: authorization.type,
+                        id: authorization.id
+                    };
                 });
+                _.each(auth.required.authorization.roles, (reqRole: any) => {
+                    unauthorizedClients = _.reduce(auth.authorization, (unauthorizedClients: any[], authorization: any) => {
+                        var typeMatch = reqRole.type == '*' || authorization.type == reqRole.type;
+                        var roleMatch = reqRole.name == '*' || (<any>_).any(authorization.roles, (role) => {
+                            return reqRole.name == role;
+                        });
+                        if (typeMatch && roleMatch) {
+                            unauthorizedClients = _.filter(unauthorizedClients, (uc) => {
+                                return uc.type != authorization.type && uc.id != authorization.id;
+                            });
+                        }
+                        return unauthorizedClients;
+                    }, unauthorizedClients);
+                });
+                var unauthorized = !_.isEmpty(unauthorizedClients);
+                if (unauthorized) {
+                    this.handleAuthFailure('unauthorized client attempted to access an authorized endpoint', 403, unauthorizedClients, emitterCb);
+                }
+                cb(unauthorized);
             }
             else {
                 cb(false);
@@ -851,51 +1019,34 @@ class AuthWorker extends Worker implements IWorker {
         }
     }
     
-    private handleAuthFailure(reason, code, cb) {
+    private handleAuthFailure(reason, code, unauthorizedClients, cb) {
         var error = 'unable to ';
         var failureEvt = void 0;
         switch (code) {
-            case 401: 
+            case 401:
                 error += 'authenticate';
                 failureEvt = 'authentication';
                 break;
-            case 403: 
+            case 403:
                 error += 'authorize';
                 failureEvt = 'authorization';
                 break;
         }
-        this.inform(failureEvt + '-failure', {
+        var authFailure: any = {
             reason: reason
-        });
+        };
+        if (!_.isEmpty(unauthorizedClients)) {
+            authFailure.unauthorizedClients = unauthorizedClients;
+        }
+        this.inform(failureEvt + '-failure', authFailure);
         if (_.isFunction(cb)) {
             var e = new Error(error);
             (<any>e).code = code;
+            if (!_.isEmpty(unauthorizedClients)) {
+                (<any>e).unauthorizedClients = unauthorizedClients;
+            }
             cb(e);
         }
-    }
-}
-
-class MockRoleProvider extends Worker implements IWorker {
-    constructor(opts?: any) {
-        super([], {
-            id: idHelper.newId(),
-            name: 'iw-role-provider'
-        }, opts);
-
-        this.opts = this.opts.beAdoptedBy({}, 'worker');
-        this.opts.merge(opts);
-    }
-    
-    public init(cb): IWorker {
-        this.respond('role-tree', (whoService, cb) => {
-            cb(null, {
-                name: 'admin',
-                children: [{
-                    name: 'mock-role'
-                }]
-            });
-        });
-        return super.init(cb);
     }
 }
 
@@ -1164,15 +1315,80 @@ class RefreshTokenRepo extends Worker implements IWorker {
     }
 }
 
-class ServiceCredsValidator extends Worker implements IWorker {
-    constructor(opts?: any) {
-        super([], {
+class CredsValidator extends Worker implements IWorker {
+    constructor(name: string, deps: string[], opts?: any) {
+        super(deps, {
             id: idHelper.newId(),
-            name: 'iw-creds-validator-service'
+            name: 'iw-creds-validator-' + name
         }, opts);
 
         this.opts = this.opts.beAdoptedBy({}, 'worker');
         this.opts.merge(opts);
+    }
+    
+    public preStart(deps, cb) {
+        this.intercept(this.getCommEvent('get-roles', 'request'), {
+            preEmit: (stop, next, anno, ...args) => {
+                var emitterCb = args.pop();
+                args.push((e, roles) => {
+                    if (e == null && this.hasListener(this.getCommEvent('role-tree', 'ask'))) {
+                        this.ask('role-tree', (e, roleTree) => {
+                            _.each(roles, (role) => {
+                                var roleBranch = this.findRoleTreeBranch(roleTree, role);
+                                if (!_.isUndefined(roleBranch)) {
+                                    var childRoles = this.buildChildRolesFromBranch(roleBranch);
+                                    roles = roles.concat(childRoles);
+                                }
+                            });
+                            emitterCb(null, _.uniq(roles));
+                        });
+                    }
+                    else {
+                        emitterCb(e, roles);
+                    }
+                });
+                next(args);
+            }
+        });
+        return super.preStart(deps, cb);
+    }
+    
+    private findRoleTreeBranch(roleTree, role): any {
+        if (_.isUndefined(roleTree)) {
+            return void 0;
+        }
+        if (roleTree.name == role) {
+            return roleTree;
+        }
+        else if (!_.isEmpty(roleTree.children)) {
+            var matchingBranch = void 0;
+            _.each(roleTree.children, (roleBranch) => {
+                var branch = this.findRoleTreeBranch(roleBranch, role);
+                if (!_.isUndefined(branch)) {
+                    matchingBranch = branch;
+                }
+            });
+            return matchingBranch;
+        }
+    }
+    
+    private buildChildRolesFromBranch(roleBranch, builtRoles?: any[]): any[] {
+        if (!_.isArray(builtRoles)) {
+            builtRoles = [];
+        }
+        builtRoles.push(roleBranch.name);
+        if (!_.isEmpty(roleBranch.children)) {
+            _.each(roleBranch.children, (roleBranch) => {
+                this.buildChildRolesFromBranch(roleBranch, builtRoles);
+            });
+        }
+        return builtRoles;
+    }
+}
+
+class ServiceCredsValidator extends CredsValidator implements IWorker {
+    constructor(opts?: any) {
+        super('service', [], opts);
     }
     
     public init(cb): IWorker {
@@ -1206,19 +1422,18 @@ class ServiceCredsValidator extends Worker implements IWorker {
                     break;
             }
         });
+        this.annotate({ internal: true }).answer<any>('role-tree', (cb) => {
+            cb(null, {
+                name: 'admin'
+            });
+        });
         return super.init(cb);
     }
 }
 
-class UserCredsValidator extends Worker implements IWorker {
+class UserCredsValidator extends CredsValidator implements IWorker {
     constructor(opts?: any) {
-        super([], {
-            id: idHelper.newId(),
-            name: 'iw-creds-validator-user'
-        }, opts);
-
-        this.opts = this.opts.beAdoptedBy({}, 'worker');
-        this.opts.merge(opts);
+        super('user', [], opts);
     }
     
     public init(cb): IWorker {
@@ -1251,6 +1466,20 @@ class UserCredsValidator extends Worker implements IWorker {
                     ])
                     break;
             }
+        });
+        this.annotate({ internal: true }).answer<any>('role-tree', (cb) => {
+            cb(null, {
+                name: 'admin',
+                children: [{
+                    name: 'mock-role',
+                    children: [{
+                        name: 'child-role',
+                        children: [{
+                            name: 'grandchild-role'
+                        }]
+                    }]
+                }]
+            });
         });
         return super.init(cb);
     }

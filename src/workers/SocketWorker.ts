@@ -106,13 +106,19 @@ class SocketWorker extends Worker implements ISocketWorker {
                 }
                 event.data.push((...args) => {
                     if (args[0] != null) {
-                        var errorObj = <any>{
+                        var errorObj: any = {
                             message: args[0].message
                         };
                         if (!_.isUndefined(args[0].code)) {
                             errorObj.code = args[0].code;
                         }
+                        if (!_.isUndefined(args[0].unauthorizedClients)) {
+                            errorObj.unauthorizedClients = args[0].unauthorizedClients;
+                        }
                         args[0] = errorObj;
+                    }
+                    if (emit.worker == 'iw-auth' && emit.name == 'logout' && _.get(args[1], 'auth.logout')) {
+                        
                     }
                     if (_.isFunction(cb)) {
                         cb.apply(this, args);

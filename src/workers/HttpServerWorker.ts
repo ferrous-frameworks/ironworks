@@ -62,7 +62,7 @@ class HttpServerWorker extends Worker implements IHttpServerWorker {
         this.routeConfig = {
             post: {
                 method: 'POST',
-                path: this.apiRoute + '/{prefix}/{service}/{method}/{worker}/{event}',
+                path: this.apiRoute + '/{prefix}/{service}/{method}/{worker}/{name}',
                 config: {
                     payload: {
                         allow: 'application/json',
@@ -73,7 +73,7 @@ class HttpServerWorker extends Worker implements IHttpServerWorker {
             },
             get: {
                 method: 'GET',
-                path: this.apiRoute + '/{prefix}/{service}/{method}/{worker}/{event}'
+                path: this.apiRoute + '/{prefix}/{service}/{method}/{worker}/{name}'
             }
         }
     }

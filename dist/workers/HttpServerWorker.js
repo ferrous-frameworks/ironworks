@@ -39,7 +39,7 @@ var HttpServerWorker = (function (_super) {
         this.routeConfig = {
             post: {
                 method: 'POST',
-                path: this.apiRoute + '/{prefix}/{service}/{method}/{worker}/{event}',
+                path: this.apiRoute + '/{prefix}/{service}/{method}/{worker}/{name}',
                 config: {
                     payload: {
                         allow: 'application/json',
@@ -50,7 +50,7 @@ var HttpServerWorker = (function (_super) {
             },
             get: {
                 method: 'GET',
-                path: this.apiRoute + '/{prefix}/{service}/{method}/{worker}/{event}'
+                path: this.apiRoute + '/{prefix}/{service}/{method}/{worker}/{name}'
             }
         };
     }
