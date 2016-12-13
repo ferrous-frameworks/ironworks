@@ -16,266 +16,251 @@ var ConnectorWorker = (function (_super) {
             id: idHelper.newId(),
             name: 'iw-connector'
         }, opts);
-        var defOpts = {
-            clientConnectionEventsLogLevel: 800,
+        this.opts = this.opts.beAdoptedBy({
+            environmentWorker: 'iw-env',
+            credsValidator: 'service',
             socketIoClient: {
                 multiplex: false,
-                timeout: 5000
+                timeout: 5000,
+                reconnection: false
             }
-        };
-        this.opts = this.opts.beAdoptedBy(defOpts, 'worker');
+        }, 'worker');
         this.opts.merge(opts);
+        this.envWorker = this.opts.get('environmentWorker');
+        this.credsValidator = this.opts.get('credsValidator');
         this.socketIoClientOpts = this.opts.get('socketIoClient');
-        this.clientConnectionEventsLogLevel = this.opts.get('clientConnectionEventsLogLevel');
-        this.autoConnect = false;
+        this.serviceConnections = [];
     }
     ConnectorWorker.prototype.init = function (cb) {
         var _this = this;
-        this.annotate({
-            internal: true
-        }).ack('connect-to-external-services', function (cb) {
-            _this.loadServiceConnections(function (e) {
-                if (e !== null) {
-                    cb(e);
+        this.annotate({ internal: true }).answer('list-external-service-names', function (cb) {
+            cb(null, _.map(_.map(_this.serviceConnections, 'service'), 'name'));
+        });
+        return _super.prototype.init.call(this, cb);
+    };
+    ConnectorWorker.prototype.postInit = function (deps, cb) {
+        var _this = this;
+        async.waterfall([
+            function (cb) {
+                _this.getServiceWorkers(function (e, workers) {
+                    cb(e, workers);
+                });
+            },
+            function (workers, cb) {
+                if (_.any(workers, function (worker) {
+                    return worker === _this.envWorker;
+                })) {
+                    _this.loadServiceConnections(function (e) {
+                        _this.setupIntercepts();
+                        cb(e);
+                    });
                 }
                 else {
-                    _.each(_this.serviceConnections, function (srvConn) {
-                        _this.intercept(srvConn.name + '.*.*.*', {
-                            preEmit: function (stop, next, anno) {
-                                var args = [];
-                                for (var _i = 3; _i < arguments.length; _i++) {
-                                    args[_i - 3] = arguments[_i];
-                                }
-                                var emit = _this.getCommEmit(args.shift());
-                                var srvClient = _.find(_this.serviceClients, function (c) {
-                                    return c.service === emit.service && c.authenticated;
-                                });
-                                if (!_.isUndefined(srvClient) && !_.isUndefined(srvClient.socket)) {
-                                    _this.emitToConnectedService(srvClient, emit, anno, args, function () {
-                                        next(args);
-                                    });
-                                }
-                            }
-                        });
-                        _this.handshakeWithConnectedService(srvConn);
-                    });
-                    cb(null);
+                    cb(new Error(_this.me.name + ' depends on ' + _this.envWorker));
                 }
-            });
+            }
+        ], function (e) {
+            if (e == null) {
+                _super.prototype.postInit.call(_this, deps, cb);
+            }
+            else {
+                cb(e);
+            }
         });
-        this.annotate({
-            internal: true
-        }).answer('list-external-service-names', function (cb) {
-            cb(null, _.pluck(_this.serviceConnections, 'name'));
-        });
+        return this;
+    };
+    ConnectorWorker.prototype.getServiceWorkers = function (cb) {
         this.annotate({
             log: {
                 level: 1000
             }
-        }).ask('iw-service.list-workers', function (e, workerNames) {
-            if (e === null) {
-                _this.autoConnect = !_.contains(_.pluck(workerNames, 'name'), 'iw-hive');
-                _super.prototype.init.call(_this, cb);
-            }
-            else if (!_.isUndefined(cb)) {
-                cb(e);
-            }
-            else {
-                _this.inform('error', e);
-            }
+        }).ask('iw-service.list-workers', function (e, workers) {
+            cb(e, _.pluck(workers, 'name'));
         });
-        return this;
-    };
-    ConnectorWorker.prototype.postInit = function (deps, cb) {
-        var _this = this;
-        if (this.autoConnect) {
-            this.annotate({
-                log: {
-                    level: 1000
-                }
-            }).confirm('connect-to-external-services', function (e) {
-                if (e === null) {
-                    if (!_.isEmpty(_this.serviceConnections)) {
-                        _this.intercept('ask.iw-service.list-listeners', {
-                            preEmit: function (stop, next, anno) {
-                                var args = [];
-                                for (var _i = 3; _i < arguments.length; _i++) {
-                                    args[_i - 3] = arguments[_i];
-                                }
-                                var listeners = args.pop();
-                                _.each(_this.serviceConnections, function (conn) {
-                                    var name = [_this.comm.prefix(), conn.name, '*', '*', '*'].join('.');
-                                    listeners.push({
-                                        annotation: {},
-                                        commEvent: _this.getCommEvent(name)
-                                    });
-                                });
-                                args.push(listeners);
-                                next(args);
-                            }
-                        });
-                    }
-                    _super.prototype.postInit.call(_this, deps, cb);
-                }
-                else if (!_.isUndefined(cb)) {
-                    cb(e);
-                }
-                else {
-                    _this.inform('error', e);
-                }
-            });
-        }
-        else {
-            _super.prototype.postInit.call(this, deps, cb);
-        }
-        return this;
-    };
-    ConnectorWorker.prototype.preStart = function (deps, cb) {
-        var _this = this;
-        async.whilst(function () {
-            return !_.every(_this.serviceClients, function (srvClient) {
-                return srvClient.authenticated && !_.isUndefined(srvClient.socket);
-            });
-        }, function (cb) {
-            setImmediate(function () {
-                cb(null);
-            });
-        }, function (e) {
-            if (e === null) {
-                _super.prototype.preStart.call(_this, deps, cb);
-            }
-            else if (_.isUndefined(cb)) {
-                cb(e);
-            }
-            else {
-                _this.inform('error', e);
-            }
-        });
-        return this;
     };
     ConnectorWorker.prototype.loadServiceConnections = function (cb) {
         var _this = this;
-        var envEvts = _.reduce(this.allCommListeners(), function (envWorkers, l) {
-            if (l.commEvent.worker.indexOf('iw-env') === 0 && l.commEvent.name === 'list-service-connections') {
-                envWorkers.push(l.commEvent);
-            }
-            return envWorkers;
-        }, []);
-        var extSrvConns = [];
-        async.whilst(function () {
-            return envEvts.length > 0;
-        }, function (cb) {
-            var envEvt = envEvts.pop();
-            _this.annotate({
-                log: {
-                    level: 1000
-                }
-            }).ask(envEvt, function (e, srvConn) {
-                extSrvConns = extSrvConns.concat(srvConn);
-                cb(null);
-            });
-        }, function (e) {
-            _this.serviceConnections = _.uniq(extSrvConns);
-            _this.serviceClients = _.map(_this.serviceConnections, function (srvConn) {
+        this.ask(this.envWorker + '.list-service-connections', function (e, serviceConnections) {
+            _this.serviceConnections = _.map(serviceConnections, function (service) {
                 return {
-                    service: srvConn.name,
-                    authenticated: _.isEmpty(srvConn.token)
+                    service: service,
+                    authpack: {}
                 };
             });
             cb(e);
         });
     };
-    ConnectorWorker.prototype.handshakeWithConnectedService = function (service) {
+    ConnectorWorker.prototype.setupIntercepts = function () {
         var _this = this;
-        var options = this.socketIoClientOpts;
-        var secureProtocol = _.any(['wss', 'https'], function (p) {
-            return p === service.protocol;
-        });
-        if (secureProtocol || service.port.toString().indexOf("443") !== -1) {
-            options.secure = true;
+        if (!_.isEmpty(this.serviceConnections)) {
+            this.intercept('inform.iw-service.available-listeners', {
+                preEmit: function (stop, next, anno) {
+                    var args = [];
+                    for (var _i = 3; _i < arguments.length; _i++) {
+                        args[_i - 3] = arguments[_i];
+                    }
+                    var listeners = args.pop();
+                    _.each(_this.serviceConnections, function (srvConn) {
+                        var name = [_this.comm.prefix(), srvConn.service.name, '*', '*', '*'].join('.');
+                        listeners.push({
+                            annotation: {},
+                            commEvent: _this.getCommEvent(name)
+                        });
+                    });
+                    args.push(listeners);
+                    next(args);
+                }
+            });
         }
-        var srvClient = _.find(this.serviceClients, function (c) {
-            return c.service === service.name;
-        });
-        if (!_.isUndefined(srvClient)) {
-            var c = ioClient(service.url, options);
-            c.on('connect', function () {
-                _this.informSocketClientEvent('connection-connect', service);
-                if (!_.isEmpty(service.token)) {
-                    c.emit(_this.getCommEvent(service.name + '.check.iw-auth.authenticate-interservice').getText(), {
-                        accessToken: service.token
-                    }, function (errorMsg) {
-                        if (errorMsg === null) {
-                            srvClient.socket = c;
-                            srvClient.authenticated = true;
+        _.each(this.serviceConnections, function (serviceConn) {
+            _this.intercept(serviceConn.service.name + '.*.*.*', {
+                preEmit: function (stop, next, anno) {
+                    var args = [];
+                    for (var _i = 3; _i < arguments.length; _i++) {
+                        args[_i - 3] = arguments[_i];
+                    }
+                    var emit = _this.getCommEmit(args.shift());
+                    var emitterCb = void 0;
+                    if (_.isFunction(_.last(args))) {
+                        emitterCb = args.pop();
+                    }
+                    _this.emitToService(serviceConn, emit, anno, args, emitterCb, function (shouldStop) {
+                        if (!shouldStop) {
+                            next();
                         }
                         else {
-                            _this.resetServiceClient(srvClient, service);
-                            _this.inform('error', new Error(errorMsg));
+                            stop();
                         }
                     });
                 }
+            });
+        });
+    };
+    ConnectorWorker.prototype.emitToService = function (srvConn, emit, anno, args, emitterCb, cb) {
+        var _this = this;
+        var clientOpts = _.cloneDeep(this.socketIoClientOpts);
+        clientOpts.extraHeaders = _.merge(_.isEmpty(srvConn.authpack) ? void 0 : {
+            authpack: JSON.stringify(srvConn.authpack)
+        }, clientOpts.extraHeaders);
+        var socket = ioClient(srvConn.service.url, clientOpts);
+        socket.once('error', function (errorJson) {
+            var errorObj = JSON.parse(errorJson);
+            var e = new Error(errorObj.message);
+            e.code = errorObj.code;
+            _this.handleSocketError(e, srvConn, socket, function (e) {
+                if (e == null) {
+                    _this.emitToService(srvConn, emit, anno, args, emitterCb, cb);
+                }
                 else {
-                    srvClient.socket = c;
-                    srvClient.authenticated = true;
+                    if (_.isFunction(emitterCb)) {
+                        emitterCb(e);
+                    }
+                    cb(true);
                 }
             });
-            c.on('reconnect', function (attempts) {
-                _this.informSocketClientEvent('connection-reconnect', service);
-            });
-            c.on('connect_error', function (e) {
-                _this.informSocketClientEvent('connection-error', service);
-            });
-            c.on('reconnecting', function (attempts) {
-                _this.informSocketClientEvent('connection-reconnecting', service);
-            });
-            c.on('reconnect_failed', function () {
-                _this.informSocketClientEvent('connection-reconnect-failed', service);
-            });
-            c.on('connect_timeout', function () {
-                _this.informSocketClientEvent('connection-timeout', service);
-            });
-            c.on('disconnect', function () {
-                _this.informSocketClientEvent('connection-disconnect', service);
-                _this.resetServiceClient(srvClient, service);
-            });
-        }
-    };
-    ConnectorWorker.prototype.resetServiceClient = function (c, s) {
-        if (!_.isUndefined(c.socket)) {
-            c.socket.disconnect(true);
-        }
-        c.socket = void 0;
-        c.authenticated = _.isEmpty(s.token);
-    };
-    ConnectorWorker.prototype.emitToConnectedService = function (c, emit, anno, args, cb) {
-        var _this = this;
-        var emitterCb = args.pop();
-        var hasCb = _.isFunction(emitterCb);
-        if (!hasCb) {
-            args.push(emitterCb);
-        }
-        args.push(function () {
-            var args = [];
-            for (var _i = 0; _i < arguments.length; _i++) {
-                args[_i - 0] = arguments[_i];
-            }
-            if (!hasCb) {
-                cb();
-            }
-            else {
-                emitterCb.apply(_this, args.concat(anno));
-            }
         });
-        c.socket.emit.apply(c.socket, [emit.getText(), emit, anno].concat(args));
+        socket.once('connect', function () {
+            socket.emit.apply(socket, [emit.getText(), emit, anno].concat(args).concat([function () {
+                    var resArgs = [];
+                    for (var _i = 0; _i < arguments.length; _i++) {
+                        resArgs[_i - 0] = arguments[_i];
+                    }
+                    if (resArgs[0] == null) {
+                        socket.close();
+                        if (_.isFunction(emitterCb)) {
+                            emitterCb.apply(_this, resArgs);
+                        }
+                        cb(false);
+                    }
+                    else {
+                        _this.handleSocketError(resArgs[0], srvConn, socket, function (e) {
+                            if (e == null) {
+                                _this.emitToService(srvConn, emit, anno, args, emitterCb, cb);
+                            }
+                            else {
+                                if (_.isFunction(emitterCb)) {
+                                    emitterCb(e);
+                                }
+                                cb(true);
+                            }
+                        });
+                    }
+                }]));
+        });
+        socket.once('connect_error', function (connError) {
+            var e = new Error(connError.message);
+            e.code = connError.description;
+            _this.handleSocketError(e, srvConn, socket, function (e) {
+                if (e == null) {
+                    _this.emitToService(srvConn, emit, anno, args, emitterCb, cb);
+                }
+                else {
+                    if (_.isFunction(emitterCb)) {
+                        emitterCb(e);
+                    }
+                    cb(true);
+                }
+            });
+        });
+        socket.once('authpack-update', function (authpack, cb) {
+            srvConn.authpack = authpack;
+            cb();
+        });
     };
-    ConnectorWorker.prototype.informSocketClientEvent = function (eventName, service) {
-        this.annotate({
-            log: {
-                level: this.clientConnectionEventsLogLevel
+    ConnectorWorker.prototype.handleSocketError = function (errorObj, srvConn, socket, cb) {
+        var _this = this;
+        socket.close();
+        var e = new Error(errorObj.message);
+        if (!_.isUndefined(errorObj.code)) {
+            e.code = errorObj.code;
+        }
+        if (!_.isUndefined(errorObj.unauthorizedClients)) {
+            e.unauthorizedClients = errorObj.unauthorizedClients;
+        }
+        switch (e.code) {
+            case 401:
+                this.authenticateWithSecureService(srvConn, function (e) {
+                    cb(e);
+                });
+                break;
+            case 403:
+                if (_.isUndefined(_.get(srvConn, 'authpack.accessToken'))) {
+                    this.authenticateWithSecureService(srvConn, function (e) {
+                        cb(e);
+                    });
+                }
+                else {
+                    if (_.any(e.unauthorizedClients, function (uc) {
+                        return uc.id == srvConn.service.id && uc.type == _this.credsValidator;
+                    })) {
+                        cb(new Error('internal server error'));
+                    }
+                    else {
+                        cb(e);
+                    }
+                }
+                break;
+            default:
+                cb(e);
+                break;
+        }
+    };
+    ConnectorWorker.prototype.authenticateWithSecureService = function (srvConn, cb) {
+        srvConn.authpack = {};
+        this.annotate({ log: { properties: [
+                    { name: 'password', secure: true },
+                    { name: 'accessToken', secure: true },
+                    { name: 'refreshToken', secure: true },
+                ] } })
+            .request(this.getCommEvent(srvConn.service.name + '.request.iw-auth.authenticate').getText(), {
+            type: this.credsValidator,
+            id: srvConn.service.id,
+            password: srvConn.service.password
+        }, function (e, authpack) {
+            if (e === null) {
+                srvConn.authpack = authpack;
             }
-        }).inform(eventName, {
-            serviceName: service.name
+            cb(e);
         });
     };
     return ConnectorWorker;

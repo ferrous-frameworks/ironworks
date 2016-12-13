@@ -116,10 +116,10 @@ describe('Service', function () {
                     serviceConnections: conns
                 }))
                 .use(new ConnectorWorker())
-                .use(new HiveWorker());
+                // .use(new HiveWorker());
             s.info('ready', function (iw) {
                 request({
-                    url: 'http://localhost:' + ports.Service[1] + '/api/comm/service-name/ask/worker/test',
+                    url: 'http://localhost:' + ports.Service[1] + '/api/comm/my-other-service/ask/worker/test',
                     method: 'POST',
                     json: true,
                     body: test

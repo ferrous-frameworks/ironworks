@@ -109,6 +109,9 @@ class Service extends Worker implements IService {
     public init(callback?: (e: Error) => void): IService {
         this.answer<IServiceListener[]>('list-listeners', (cb) => {
             this.ask<IServiceListener[]>('list-local-listeners', (e, listeners) => {
+                // if (_.map(_.map(this.workers.list(), 'me'), 'name').indexOf('iw-connector') > -1) {
+                    
+                // }
                 cb(null, listeners);
             });
         });
@@ -156,35 +159,37 @@ class Service extends Worker implements IService {
     }
 
     public preStart(dependencies?: ICollection<IDependency<IService>>, callback?: (e: Error) => void): IService {
-        var extSrvConnEvt = _.find(this.allCommListeners(), (l) => {
-            return l.commEvent.name === 'init-external-service-connections';
-        });
-        if (!_.isUndefined(extSrvConnEvt)) {
-            this.annotate({
-                internal: true
-            }).info<IHiveHeartbeat>(extSrvConnEvt.commEvent.worker + '.heartbeat', (heartbeat) => {
-                this.annotate({
-                    log: {
-                        level: this.availableListenersEventLogLevel
-                    }
-                }).inform<IServiceListener[]>('available-listeners', heartbeat.availableListeners);
-            });
-            this.confirm(extSrvConnEvt.event, (e) => {
-                if (e === null) {
-                    super.preStart(new Collection<IWorker>(idHelper.newId()), callback);
-                }
-                else if (!_.isUndefined(callback)) {
-                    callback(e);
-                }
-                else {
-                    this.inform<Error>('error', e);
-                }
-            });
-        }
-        else {
-            super.preStart(new Collection<IWorker>(idHelper.newId()), callback);
-        }
+        super.preStart(new Collection<IWorker>(idHelper.newId()), callback);
         return this;
+        // var extSrvConnEvt = _.find(this.allCommListeners(), (l) => {
+        //     return l.commEvent.name === 'init-external-service-connections';
+        // });
+        // if (!_.isUndefined(extSrvConnEvt)) {
+        //     this.annotate({
+        //         internal: true
+        //     }).info<IHiveHeartbeat>(extSrvConnEvt.commEvent.worker + '.heartbeat', (heartbeat) => {
+        //         this.annotate({
+        //             log: {
+        //                 level: this.availableListenersEventLogLevel
+        //             }
+        //         }).inform<IServiceListener[]>('available-listeners', heartbeat.availableListeners);
+        //     });
+        //     this.confirm(extSrvConnEvt.event, (e) => {
+        //         if (e === null) {
+        //             super.preStart(new Collection<IWorker>(idHelper.newId()), callback);
+        //         }
+        //         else if (!_.isUndefined(callback)) {
+        //             callback(e);
+        //         }
+        //         else {
+        //             this.inform<Error>('error', e);
+        //         }
+        //     });
+        // }
+        // else {
+        //     super.preStart(new Collection<IWorker>(idHelper.newId()), callback);
+        // }
+        // return this;
     }
 
     public start(dependencies?: ICollection<IDependency<IService>>, callback?: (e: Error) => void): IService {

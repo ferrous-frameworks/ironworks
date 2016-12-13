@@ -49,13 +49,13 @@ describe('ConnectorWorker', function () {
             host: 'localhost',
             port: ports.ConnectorWorker[0]
         }];
-        var socketServer = io(ports.ConnectorWorker[0]);
-        socketServer.on('connection', function (socket) {});
         new Service('iw-env-test-service')
             .use(new EnvironmentWorker('test', {
                 serviceConnections: extSrvConns
             }))
-            .use(new ConnectorWorker())
+            .use(new ConnectorWorker({
+                environmentWorker: 'iw-env-test'
+            }))
             .info<IServiceReady>('ready', function (iw) {
                 iw.service.ask<string[]>('iw-connector.list-external-service-names', function (e, extSrvNames) {
                     expect(e).to.be.null;
@@ -84,7 +84,9 @@ describe('ConnectorWorker', function () {
                     port: ports.ConnectorWorker[1]
                 }]
             }))
-            .use(new ConnectorWorker())
+            .use(new ConnectorWorker({
+                environmentWorker: 'iw-env-test'
+            }))
             .info<IServiceReady>('ready', function (iw) {
                 iw.service.request<any,any>('iw-env-ext-service.request.iw-echo-test.echo', {
                     some: 'data'
@@ -113,7 +115,9 @@ describe('ConnectorWorker', function () {
                     port: ports.ConnectorWorker[2]
                 }]
             }))
-            .use(new ConnectorWorker())
+            .use(new ConnectorWorker({
+                environmentWorker: 'iw-env-test'
+            }))
             .use(new HttpServerWorker({
                 apiRoute: 'api',
                 port: ports.ConnectorWorker[3]

@@ -70,6 +70,8 @@ var Service = (function (_super) {
         var _this = this;
         this.answer('list-listeners', function (cb) {
             _this.ask('list-local-listeners', function (e, listeners) {
+                // if (_.map(_.map(this.workers.list(), 'me'), 'name').indexOf('iw-connector') > -1) {
+                // }
                 cb(null, listeners);
             });
         });
@@ -115,36 +117,37 @@ var Service = (function (_super) {
         return this;
     };
     Service.prototype.preStart = function (dependencies, callback) {
-        var _this = this;
-        var extSrvConnEvt = _.find(this.allCommListeners(), function (l) {
-            return l.commEvent.name === 'init-external-service-connections';
-        });
-        if (!_.isUndefined(extSrvConnEvt)) {
-            this.annotate({
-                internal: true
-            }).info(extSrvConnEvt.commEvent.worker + '.heartbeat', function (heartbeat) {
-                _this.annotate({
-                    log: {
-                        level: _this.availableListenersEventLogLevel
-                    }
-                }).inform('available-listeners', heartbeat.availableListeners);
-            });
-            this.confirm(extSrvConnEvt.event, function (e) {
-                if (e === null) {
-                    _super.prototype.preStart.call(_this, new Collection(idHelper.newId()), callback);
-                }
-                else if (!_.isUndefined(callback)) {
-                    callback(e);
-                }
-                else {
-                    _this.inform('error', e);
-                }
-            });
-        }
-        else {
-            _super.prototype.preStart.call(this, new Collection(idHelper.newId()), callback);
-        }
+        _super.prototype.preStart.call(this, new Collection(idHelper.newId()), callback);
         return this;
+        // var extSrvConnEvt = _.find(this.allCommListeners(), (l) => {
+        //     return l.commEvent.name === 'init-external-service-connections';
+        // });
+        // if (!_.isUndefined(extSrvConnEvt)) {
+        //     this.annotate({
+        //         internal: true
+        //     }).info<IHiveHeartbeat>(extSrvConnEvt.commEvent.worker + '.heartbeat', (heartbeat) => {
+        //         this.annotate({
+        //             log: {
+        //                 level: this.availableListenersEventLogLevel
+        //             }
+        //         }).inform<IServiceListener[]>('available-listeners', heartbeat.availableListeners);
+        //     });
+        //     this.confirm(extSrvConnEvt.event, (e) => {
+        //         if (e === null) {
+        //             super.preStart(new Collection<IWorker>(idHelper.newId()), callback);
+        //         }
+        //         else if (!_.isUndefined(callback)) {
+        //             callback(e);
+        //         }
+        //         else {
+        //             this.inform<Error>('error', e);
+        //         }
+        //     });
+        // }
+        // else {
+        //     super.preStart(new Collection<IWorker>(idHelper.newId()), callback);
+        // }
+        // return this;
     };
     Service.prototype.start = function (dependencies, callback) {
         var _this = this;

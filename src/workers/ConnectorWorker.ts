@@ -7,288 +7,266 @@ import idHelper = require('../helpers/idHelper');
 
 import Worker = require('../workers/Worker');
 import IWorker = require('../interfaces/workers/IWorker');
-import IConnectorWorkerOpts = require('../interfaces/opts/IConnectorWorkerOpts');
-import IServiceConnection = require('../interfaces/workers/IServiceConnection');
-import ICommEmit = require('../interfaces/eventing/ICommEmit');
-import CommEmit = require('../eventing/CommEmit');
+// import IConnectorWorkerOpts = require('../interfaces/opts/IConnectorWorkerOpts');
+// import IServiceConnection = require('../interfaces/workers/IServiceConnection');
+// import ICommEmit = require('../interfaces/eventing/ICommEmit');
+// import CommEmit = require('../eventing/CommEmit');
 import IServiceListener = require('../interfaces/service/IServiceListener');
 
-interface IServiceClient {
-    service: string;
-    socket?: any;
-    authenticated: boolean;
-}
-
 class ConnectorWorker extends Worker implements IWorker {
+    private envWorker: string;
+    private credsValidator: string;
     private socketIoClientOpts: any;
-    private serviceConnections: IServiceConnection[];
-    private serviceClients: IServiceClient[];
-    private clientConnectionEventsLogLevel: number;
-    private autoConnect: boolean;
-
-    constructor(opts?: IConnectorWorkerOpts) {
+    private serviceConnections: {
+        service: any;
+        authpack?: any;
+    }[]
+    
+    constructor(opts?: any) {
         super([], {
             id: idHelper.newId(),
             name: 'iw-connector'
         }, opts);
-        var defOpts = {
-            clientConnectionEventsLogLevel: 800,
+        
+        this.opts = this.opts.beAdoptedBy(<any>{
+            environmentWorker: 'iw-env',
+            credsValidator: 'service',
             socketIoClient: {
                 multiplex: false,
-                timeout: 5000
+                timeout: 5000,
+                reconnection: false
             }
-        };
-        this.opts = this.opts.beAdoptedBy<IConnectorWorkerOpts>(defOpts, 'worker');
+        }, 'worker');
         this.opts.merge(opts);
-
+        
+        this.envWorker = this.opts.get<string>('environmentWorker');
+        this.credsValidator = this.opts.get<string>('credsValidator');
         this.socketIoClientOpts = this.opts.get('socketIoClient');
         
-        this.clientConnectionEventsLogLevel = this.opts.get<number>('clientConnectionEventsLogLevel');
-
-        this.autoConnect = false;
+        this.serviceConnections = [];
     }
     
     public init(cb): IWorker {
-        this.annotate({
-            internal: true
-        }).ack('connect-to-external-services', (cb) => {
-            this.loadServiceConnections((e) => {
-                if (e !== null) {
-                    cb(e);
-                }
-                else {
-                    _.each(this.serviceConnections, (srvConn) => {
-                        this.intercept(srvConn.name + '.*.*.*', {
-                            preEmit: (stop, next, anno, ...args) => {
-                                var emit = this.getCommEmit(args.shift());
-                                var srvClient = _.find(this.serviceClients, (c) => {
-                                    return c.service === emit.service && c.authenticated;
-                                });
-                                if (!_.isUndefined(srvClient) && !_.isUndefined(srvClient.socket)) {
-                                    this.emitToConnectedService(srvClient, emit, anno, args, () => {
-                                        next(args);
-                                    });
-                                }
-                            }
-                        });
-                        this.handshakeWithConnectedService(srvConn);
-                    });
-                    cb(null);
-                }
-            });
+        this.annotate({ internal: true }).answer('list-external-service-names', (cb) => {
+            cb(null, _.map(_.map(this.serviceConnections, 'service'), 'name'));
         });
-        this.annotate({
-            internal: true
-        }).answer('list-external-service-names', (cb) => {
-            cb(null, (<any>_).pluck(this.serviceConnections, 'name'));
-        });
-        this.annotate({
-            log:{
-                level:1000
-            }
-        }).ask<string[]>('iw-service.list-workers', (e, workerNames) => {
-            if (e === null) {
-                this.autoConnect = !(<any>_).contains((<any>_).pluck(workerNames, 'name'), 'iw-hive');
-                super.init(cb);
-            }
-            else if (!_.isUndefined(cb)) {
-                cb(e);
-            }
-            else {
-                this.inform('error', e);
-            }
-        });
-        return this;
+        return super.init(cb);
     }
-
+    
     public postInit(deps, cb): IWorker {
-        if (this.autoConnect) {
-            this.annotate({
-                log:{
-                    level:1000
-                }
-            }).confirm('connect-to-external-services', (e) => {
-                if (e === null) {
-                    if (!_.isEmpty(this.serviceConnections)) {
-                        this.intercept('ask.iw-service.list-listeners', {
-                            preEmit: (stop, next, anno, ...args) => {
-                                var listeners:IServiceListener[] = args.pop();
-                                _.each(this.serviceConnections, (conn) => {
-                                    var name = [this.comm.prefix(), conn.name, '*', '*', '*'].join('.');
-                                    listeners.push({
-                                        annotation: {},
-                                        commEvent: this.getCommEvent(name)
-                                    });
-                                });
-                                args.push(listeners);
-                                next(args);
-                            }
-                        });
-                    }
-                    super.postInit(deps, cb);
-                }
-                else if (!_.isUndefined(cb)) {
-                    cb(e);
+        async.waterfall([
+            (cb) => {
+                this.getServiceWorkers((e, workers) => {
+                    cb(e, workers);
+                });
+            },
+            (workers, cb) => {
+                if ((<any>_).any(workers, (worker: any) => {
+                    return worker === this.envWorker;
+                })) {
+                    this.loadServiceConnections((e) => {
+                        this.setupIntercepts();
+                        cb(e);
+                    });
                 }
                 else {
-                    this.inform<Error>('error', e);
+                    cb(new Error(this.me.name + ' depends on ' + this.envWorker))
                 }
-            });
-        }
-        else {
-            super.postInit(deps, cb);
-        }
-        return this;
-    }
-
-    public preStart(deps, cb): IWorker {
-        async.whilst(() => {
-            return !_.every(this.serviceClients, (srvClient: IServiceClient) => {
-                return srvClient.authenticated && !_.isUndefined(srvClient.socket);
-            });
-        }, (cb) => {
-            setImmediate(() => {
-                cb(null);
-            });
-        }, (e) => {
-            if (e === null) {
-                super.preStart(deps, cb);
             }
-            else if (_.isUndefined(cb)) {
-                cb(e);
+        ], (e) => {
+            if (e == null) {
+                super.postInit(deps, cb);
             }
             else {
-                this.inform<Error>('error', e);
+                cb(e);
             }
         });
         return this;
+    }
+    
+    private getServiceWorkers(cb: (e: Error, workers: string[]) => void) {
+        this.annotate({
+            log: {
+                level: 1000
+            }
+        }).ask<string[]>('iw-service.list-workers', (e, workers) => {
+            cb(e, (<any>_).pluck(workers, 'name'));
+        }); 
     }
     
     private loadServiceConnections(cb: (e: Error) => void) {
-        var envEvts = _.reduce(this.allCommListeners(), (envWorkers, l) => {
-            if (l.commEvent.worker.indexOf('iw-env') === 0 && l.commEvent.name === 'list-service-connections') {
-                envWorkers.push(l.commEvent);
-            }
-            return envWorkers;
-        }, []);
-        var extSrvConns = [];
-        async.whilst(
-            () => {
-                return envEvts.length > 0;
-            },
-            (cb) => {
-                var envEvt = envEvts.pop();
-                this.annotate({
-                    log:{
-                        level:1000
-                    }
-                }).ask(envEvt, (e, srvConn) => {
-                    extSrvConns = extSrvConns.concat(srvConn);
-                    cb(null);
-                });
-            },
-            (e) => {
-                this.serviceConnections = _.uniq(extSrvConns);
-                this.serviceClients = _.map<IServiceConnection, IServiceClient>(this.serviceConnections, (srvConn): IServiceClient => {
-                    return {
-                        service: srvConn.name,
-                        authenticated: _.isEmpty(srvConn.token)
-                    };
-                });
-                cb(e);
-            }
-        );
+        this.ask<any>(this.envWorker + '.list-service-connections', (e, serviceConnections) => {
+            this.serviceConnections = <any>_.map(serviceConnections, (service) => {
+                return {
+                    service: service,
+                    authpack: {}
+                };
+            });
+            cb(e);
+        });
     }
-
-    private handshakeWithConnectedService(service: IServiceConnection) {
-        var options = this.socketIoClientOpts;
-        var secureProtocol = (<any>_).any(['wss','https'], (p) => {
-            return p === service.protocol;
-        });
-        if (secureProtocol || service.port.toString().indexOf("443") !== -1) {
-            options.secure = true;
+    
+    private setupIntercepts() {
+        if (!_.isEmpty(this.serviceConnections)) {
+            this.intercept('inform.iw-service.available-listeners', {
+                preEmit: (stop, next, anno, ...args) => {
+                    var listeners:IServiceListener[] = args.pop();
+                    _.each(this.serviceConnections, (srvConn) => {
+                        var name = [this.comm.prefix(), srvConn.service.name, '*', '*', '*'].join('.');
+                        listeners.push({
+                            annotation: {},
+                            commEvent: this.getCommEvent(name)
+                        });
+                    });
+                    args.push(listeners);
+                    next(args);
+                }
+            });
         }
-        var srvClient = _.find(this.serviceClients, (c) => {
-            return c.service === service.name;
-        });
-        if (!_.isUndefined(srvClient)) {
-            var c: any = ioClient(service.url, options);
-            c.on('connect', () => {
-                this.informSocketClientEvent('connection-connect', service);
-                if (!_.isEmpty(service.token)) {
-                    c.emit(this.getCommEvent(service.name + '.check.iw-auth.authenticate-interservice').getText(), {
-                        accessToken: service.token
-                    }, (errorMsg) => {
-                        if (errorMsg === null) {
-                            srvClient.socket = c;
-                            srvClient.authenticated = true;
+        _.each(this.serviceConnections, (serviceConn) => {
+            this.intercept(serviceConn.service.name + '.*.*.*', {
+                preEmit: (stop, next, anno, ...args) => {
+                    var emit = this.getCommEmit(args.shift());
+                    var emitterCb = void 0;
+                    if (_.isFunction(_.last(args))) {
+                        emitterCb = args.pop();
+                    }
+                    this.emitToService(serviceConn, emit, anno, args, emitterCb, (shouldStop) => {
+                        if (!shouldStop) {
+                            next();
                         }
                         else {
-                            this.resetServiceClient(srvClient, service);
-                            this.inform<Error>('error', new Error(errorMsg));
+                            stop();
                         }
                     });
                 }
-                else {
-                    srvClient.socket = c;
-                    srvClient.authenticated = true;
-                }
             });
-            c.on('reconnect', (attempts) => {
-                this.informSocketClientEvent('connection-reconnect', service);
-            });
-            c.on('connect_error', (e) => {
-                this.informSocketClientEvent('connection-error', service);
-            });
-            c.on('reconnecting', (attempts) => {
-                this.informSocketClientEvent('connection-reconnecting', service);
-            });
-            c.on('reconnect_failed', () => {
-                this.informSocketClientEvent('connection-reconnect-failed', service);
-            });
-            c.on('connect_timeout', () => {
-                this.informSocketClientEvent('connection-timeout', service);
-            });
-            c.on('disconnect', () => {
-                this.informSocketClientEvent('connection-disconnect', service);
-                this.resetServiceClient(srvClient, service);
-            });
-        }
-    }
-
-    private resetServiceClient(c: IServiceClient, s: IServiceConnection) {
-        if (!_.isUndefined(c.socket)) {
-            c.socket.disconnect(true);
-        }
-        c.socket = void 0;
-        c.authenticated = _.isEmpty(s.token);
-    }
-
-    private emitToConnectedService(c: IServiceClient, emit, anno, args, cb) {
-        var emitterCb = args.pop();
-        var hasCb = _.isFunction(emitterCb);
-        if (!hasCb) {
-            args.push(emitterCb);
-        }
-        args.push((...args) => {
-            if (!hasCb) {
-                cb();
-            }
-            else {
-                emitterCb.apply(this, args.concat(anno));
-            }
         });
-        c.socket.emit.apply(c.socket, [emit.getText(), emit, anno].concat(args));
     }
     
-    private informSocketClientEvent(eventName: string, service: IServiceConnection) {
-        this.annotate({
-            log: {
-                level: this.clientConnectionEventsLogLevel
-            }
-        }).inform(eventName, {
-            serviceName: service.name
+    private emitToService(srvConn: any, emit: any, anno: any, args: any[], emitterCb, cb) {
+        var clientOpts = _.cloneDeep(this.socketIoClientOpts);
+        clientOpts.extraHeaders = _.merge(_.isEmpty(srvConn.authpack) ? void 0 : { 
+            authpack: JSON.stringify(srvConn.authpack)
+        }, clientOpts.extraHeaders);
+        var socket: any = ioClient(srvConn.service.url, clientOpts);
+        socket.once('error', (errorJson) => {
+            var errorObj = JSON.parse(errorJson);
+            var e = new Error(errorObj.message);
+            (<any>e).code = errorObj.code;
+            this.handleSocketError(e, srvConn, socket, (e) => {
+                if (e == null) {
+                    this.emitToService(srvConn, emit, anno, args, emitterCb, cb);
+                }
+                else {
+                    if (_.isFunction(emitterCb)) {
+                        emitterCb(e);
+                    }
+                    cb(true);
+                }
+            });
         });
+        socket.once('connect', () => {
+            socket.emit.apply(socket, [emit.getText(), emit, anno].concat(args).concat([ (...resArgs) => {
+                if (resArgs[0] == null) {
+                    socket.close();
+                    if (_.isFunction(emitterCb)) {
+                        emitterCb.apply(this, resArgs);
+                    }
+                    cb(false);
+                }
+                else {
+                    this.handleSocketError(resArgs[0], srvConn, socket, (e) => {
+                        if (e == null) {
+                            this.emitToService(srvConn, emit, anno, args, emitterCb, cb);
+                        }
+                        else {
+                            if (_.isFunction(emitterCb)) {
+                                emitterCb(e);
+                            }
+                            cb(true);
+                        }
+                        
+                    });
+                }
+            } ]));
+        });
+        socket.once('connect_error', (connError) => {
+            var e = new Error(connError.message);
+            (<any>e).code = connError.description;
+            this.handleSocketError(e, srvConn, socket, (e) => {
+                if (e == null) {
+                    this.emitToService(srvConn, emit, anno, args, emitterCb, cb);
+                }
+                else {
+                    if (_.isFunction(emitterCb)) {
+                        emitterCb(e);
+                    }
+                    cb(true);
+                }
+            });
+        });
+        socket.once('authpack-update', (authpack, cb) => {
+            srvConn.authpack = authpack;
+            cb();
+        });
+    }
+    
+    private handleSocketError(errorObj, srvConn, socket, cb) {
+        socket.close();
+        var e: any = new Error(errorObj.message);
+        if (!_.isUndefined(errorObj.code)) {
+            (<any>e).code = errorObj.code;
+        }
+        if (!_.isUndefined(errorObj.unauthorizedClients)) {
+            (<any>e).unauthorizedClients = errorObj.unauthorizedClients;
+        }
+        switch (e.code) {
+            case 401:
+                this.authenticateWithSecureService(srvConn, (e) => {
+                    cb(e);
+                });
+                break;
+            case 403:
+                if (_.isUndefined(_.get(srvConn, 'authpack.accessToken'))) {
+                    this.authenticateWithSecureService(srvConn, (e) => {
+                        cb(e);
+                    }); 
+                }
+                else {
+                    if ((<any>_).any((<any>e).unauthorizedClients, (uc) => {
+                        return uc.id == srvConn.service.id && uc.type == this.credsValidator;
+                    })) {
+                        cb(new Error('internal server error'));
+                    }
+                    else {
+                        cb(e);
+                    }
+                }
+                break;
+            default:
+                cb(e);
+                break;
+        }
+    }
+    
+    private authenticateWithSecureService(srvConn: any, cb: (e: Error) => void) {
+        srvConn.authpack = {};
+        this.annotate({ log: { properties: [
+            { name: 'password', secure: true },
+            { name: 'accessToken', secure: true },
+            { name: 'refreshToken', secure: true },
+        ] } })
+            .request(this.getCommEvent(srvConn.service.name + '.request.iw-auth.authenticate').getText(), {
+                type: this.credsValidator,
+                id: srvConn.service.id,
+                password: srvConn.service.password
+            }, (e, authpack) => {
+                if (e === null) {
+                    srvConn.authpack = authpack;
+                }
+                cb(e);
+            });
     }
 }
 
