@@ -116,7 +116,9 @@ class Service extends Worker implements IService {
             });
         });
         this.answer<IAmVersioned>('who', (cb) => {
-            cb(null, this.whoService);
+            cb(null, <IAmVersioned>_.extend(_.clone(this.whoService), {
+                nodeVersion: process.version
+            }));
         });
         this.annotate({ log: { level: 900 } }).answer<IServiceListener[]>('list-local-listeners', (cb) => {
             cb(null, _.reduce<IServiceListener, IServiceListener[]>(this.allCommListeners(), (availableListeners, l) => {

@@ -76,7 +76,9 @@ var Service = (function (_super) {
             });
         });
         this.answer('who', function (cb) {
-            cb(null, _this.whoService);
+            cb(null, _.extend(_.clone(_this.whoService), {
+                nodeVersion: process.version
+            }));
         });
         this.annotate({ log: { level: 900 } }).answer('list-local-listeners', function (cb) {
             cb(null, _.reduce(_this.allCommListeners(), function (availableListeners, l) {
