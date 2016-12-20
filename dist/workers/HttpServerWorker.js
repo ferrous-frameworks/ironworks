@@ -172,16 +172,22 @@ var HttpServerWorker = (function (_super) {
                 break;
         }
     };
-    HttpServerWorker.prototype.handleApiReqCallback = function (cb, reply) {
-        var args = [];
-        for (var _i = 2; _i < arguments.length; _i++) {
-            args[_i - 2] = arguments[_i];
-        }
+    HttpServerWorker.prototype.handleApiReqCallback = function (cb, reply, e, result) {
         if (_.isFunction(cb)) {
-            cb.apply(void 0, args);
+            cb.apply(void 0, e, result);
         }
         else {
-            reply.apply(reply, args);
+            var response = reply(e, _.omit(result, '__http'));
+            var statusCode = _.get(result, '__http.statusCode');
+            if (!_.isUndefined(statusCode)) {
+                response.statusCode = statusCode;
+            }
+            var headers = _.get(result, '__http.headers');
+            if (!_.isUndefined(headers)) {
+                _.each(headers, function (v, k) {
+                    response.header(k, v);
+                });
+            }
         }
     };
     HttpServerWorker.prototype.postInit = function (dependencies, callback) {

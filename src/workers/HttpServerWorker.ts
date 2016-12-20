@@ -197,12 +197,22 @@ class HttpServerWorker extends Worker implements IHttpServerWorker {
         }
     }
 
-    private handleApiReqCallback(cb, reply, ...args) {
+    private handleApiReqCallback(cb, reply, e, result?) {
         if (_.isFunction(cb)) {
-            cb.apply(void 0, args);
+            cb.apply(void 0, e, result);
         }
         else {
-            reply.apply(reply, args);
+            var response = reply(e, _.omit(result, '__http'));
+            var statusCode = _.get(result, '__http.statusCode');
+            if (!_.isUndefined(statusCode)) {
+                response.statusCode = statusCode;
+            }
+            var headers = _.get(result, '__http.headers');
+            if (!_.isUndefined(headers)) {
+                _.each(headers, (v, k) => {
+                    response.header(k, v);
+                });
+            }
         }
     }
 
