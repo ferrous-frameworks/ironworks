@@ -202,16 +202,21 @@ class HttpServerWorker extends Worker implements IHttpServerWorker {
             cb.apply(void 0, e, result);
         }
         else {
-            var response = reply(e, _.omit(result, '__http'));
-            var statusCode = _.get(result, '__http.statusCode');
-            if (!_.isUndefined(statusCode)) {
-                response.statusCode = statusCode;
+            if (!_.isObject(result)) {
+                reply(e, result);
             }
-            var headers = _.get(result, '__http.headers');
-            if (!_.isUndefined(headers)) {
-                _.each(headers, (v, k) => {
-                    response.header(k, v);
-                });
+            else {
+                var response = reply(e, _.omit(result, '__http'));
+                var statusCode = _.get(result, '__http.statusCode');
+                if (!_.isUndefined(statusCode)) {
+                    response.statusCode = statusCode;
+                }
+                var headers = _.get(result, '__http.headers');
+                if (!_.isUndefined(headers)) {
+                    _.each(headers, (v, k) => {
+                        response.header(k, v);
+                    });
+                }
             }
         }
     }
