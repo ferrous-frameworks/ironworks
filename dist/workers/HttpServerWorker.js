@@ -177,7 +177,7 @@ var HttpServerWorker = (function (_super) {
             cb.apply(void 0, e, result);
         }
         else {
-            if (!_.isObject(result)) {
+            if (!_.isObject(result) || _.isArray(result)) {
                 reply(e, result);
             }
             else {
